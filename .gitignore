@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Data directories (if someone accidentally puts large data in project)
+data/full_export/
+data/large_datasets/
+
+# Databases (keep out of git)
+*.db
+*.sqlite3
+
+# Downloaded models (Week 3-4)
+models/
+*.pt
+*.pth
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep sample data directory structure but not contents
+!data/sample_photos/.gitkeep

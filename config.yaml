@@ -1,0 +1,14 @@
+# Default paths (can be overridden by CLI arguments)
+
+paths:
+  input_directory: ~/data/media/images/IPHONE
+  output_database: ~/data/photo_archives/photo_archive.db
+  model_cache: ~/data/photo_archives/models
+
+processing:
+  batch_size: 32
+  confidence_threshold: 0.5
+
+models:
+  yolo: yolov8m.pt
+  clip: ViT-L-14
