@@ -9,10 +9,6 @@ venv/
 data/full_export/
 data/large_datasets/
 
-# Databases (keep out of git)
-*.db
-*.sqlite3
-
 # Downloaded models (Week 3-4)
 models/
 *.pt
@@ -26,6 +22,21 @@ models/
 .DS_Store
 Thumbs.db
 
-# Keep sample data directory structure but not contents
-!data/sample_photos/.gitkeep
+# Database files (keep test dbs out of git)
+*.db
+*.db-journal
+*.sqlite3
+
+# Organized output directories
+data/organized/*
+data/organized_test/*
+
+# Keep directory structure
+!data/organized/.gitkeep
 !data/organized_test/.gitkeep
+
+# Sample photos (optional - you might WANT these in git for testing)
+# For now, keep sample photos tracked (they're test fixtures)
+# data/sample_photos/*
+# !data/sample_photos/.gitkeep
+
