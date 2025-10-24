@@ -28,3 +28,4 @@ Thumbs.db
 
 # Keep sample data directory structure but not contents
 !data/sample_photos/.gitkeep
+!data/organized_test/.gitkeep
