@@ -83,7 +83,7 @@ def show_date_range(conn, start_date, end_date):
             print(f"  {date}: {filename} ({camera})")
     else:
         print("  No images in this date range")
-
+    
 
 def show_filesystem_sources(conn):
     """Show only filesystem-sourced images."""
@@ -125,8 +125,8 @@ if __name__ == "__main__":
         print(f"Database {db_path} not found!")
         exit(1)
     
-    conn = connect_db((db_path))
-    
+    conn = connect_db(str(db_path))
+        
     # Run all queries
     show_schema(conn)
     show_all_images(conn)
