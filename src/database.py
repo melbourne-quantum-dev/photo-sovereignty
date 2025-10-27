@@ -8,9 +8,11 @@ def create_database(db_path="photo_archive.db"):
     
     Returns connection object.
     """
+    # conn object represents established connection, acting as the link between your Python program and the database
     conn = sqlite3.connect(db_path)
+    # cursor object = control structure that allows you to execute SQL commands and manage the results within the context of that database connection
     cursor = conn.cursor()
-    
+    # create a table (like a spreadsheet)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS images (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
