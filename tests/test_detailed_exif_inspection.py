@@ -1,6 +1,5 @@
 # Test all 5 samples with detailed EXIF inspection
 from PIL import Image
-from PIL.ExifTags import TAGS
 from pillow_heif import register_heif_opener
 from pathlib import Path
 

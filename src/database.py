@@ -1,6 +1,5 @@
 # src/database.py
 import sqlite3
-from pathlib import Path
 from datetime import datetime
 
 def create_database(db_path="photo_archive.db"):
