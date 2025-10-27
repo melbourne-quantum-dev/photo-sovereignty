@@ -144,3 +144,4 @@ if __name__ == "__main__":
     print(f"✅ Found {len(results)} Apple photos")
     
     conn.close()
+    

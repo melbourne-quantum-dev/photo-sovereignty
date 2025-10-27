@@ -1,11 +1,11 @@
 # src/gps_extractor.py
-from PIL import Image
 from pathlib import Path
+
+from PIL import Image
 from pillow_heif import register_heif_opener
 
 # Register HEIC support
 register_heif_opener()
-
 
 def convert_to_degrees(dms_tuple):
     """Convert GPS DMS (degrees, minutes, seconds) to decimal degrees.
@@ -77,7 +77,6 @@ if __name__ == "__main__":
     print(f"File path: {image_path}")
     print(f"File exists: {image_path.exists()}")
     
-    
     # Extract GPS
     gps_coords = extract_gps_coords(image_path)
     
@@ -105,3 +104,4 @@ if __name__ == "__main__":
                 print("❌ No EXIF data at all")
         except Exception as e:
             print(f"❌ Error opening image: {e}")
+            
