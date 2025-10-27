@@ -83,6 +83,7 @@ def show_date_range(conn, start_date, end_date):
             print(f"  {date}: {filename} ({camera})")
     else:
         print("  No images in this date range")
+    
 
 def show_filesystem_sources(conn):
     """Show only filesystem-sourced images."""
@@ -118,12 +119,14 @@ def show_schema(conn):
 
 # Interactive playground
 if __name__ == "__main__":
-    db_path = "test.db"
+    db_path = Path("~/data/media/images/organised/photo_archive.db").expanduser()
     
-    if not Path(db_path).exists():
+    if not db_path.exists():
         print(f"Database {db_path} not found!")
-        print("Run: python process_photos.py --source data/sample_photos --output data/organized --db test.db")
         exit(1)
+    
+    conn = connect_db(str(db_path))
+    # ... rest of code
     
     conn = connect_db(db_path)
     
