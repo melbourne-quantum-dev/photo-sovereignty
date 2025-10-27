@@ -1,7 +1,8 @@
 # src/exif_parser.py
-from PIL import Image
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
+
+from PIL import Image
 from pillow_heif import register_heif_opener
 
 # Register HEIC support
@@ -155,3 +156,4 @@ if __name__ == "__main__":
     print(f"\nProcessed {len(results)} images")
     for r in results:
         print(f"{r['filename']}: {r['date_source']}")
+        
