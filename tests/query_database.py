@@ -72,7 +72,7 @@ def show_date_range(conn, start_date, end_date):
         ORDER BY date_taken
     """, (start_date, end_date))
     
-    print(f"\n" + "="*80)
+    print("\n" + "="*80)
     print(f"IMAGES BETWEEN {start_date} AND {end_date}")
     print("="*80)
     

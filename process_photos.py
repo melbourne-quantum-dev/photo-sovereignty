@@ -7,7 +7,6 @@ Usage:
 """
 
 import argparse
-from pathlib import Path
 from src.exif_parser import rename_and_organize
 from src.database import create_database, insert_image
 
