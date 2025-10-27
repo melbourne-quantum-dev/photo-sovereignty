@@ -68,7 +68,6 @@ def extract_gps_coords(image_path):
         return None
     
 if __name__ == "__main__":
-    from pathlib import Path
     
     # Test file path
     image_path = Path("~/data/media/images/organised/iphone_mouse_warfare/2025/2025-06-02_001524.heic").expanduser()
@@ -88,7 +87,6 @@ if __name__ == "__main__":
         
         # Debug: Check if image opens at all
         try:
-            from PIL import Image
             img = Image.open(image_path)
             print(f"✅ Image opens OK: {img.size}")
             

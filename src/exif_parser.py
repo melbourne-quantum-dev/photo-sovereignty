@@ -1,4 +1,5 @@
 # src/exif_parser.py
+import shutil
 from pathlib import Path
 from datetime import datetime
 
@@ -128,7 +129,6 @@ def rename_and_organize(source_dir, dest_dir):
             new_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Copy file (don't delete original yet - safety)
-            import shutil
             shutil.copy2(img_path, new_path)
             
             # Store result
