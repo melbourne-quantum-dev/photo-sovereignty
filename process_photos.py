@@ -3,7 +3,14 @@
 Process photos: Extract EXIF, organize files, store in database.
 
 Usage:
-    python process_photos.py --source ~/Pictures/test --output ~/Pictures/organized
+    # Use config.yaml paths (recommended)
+    python process_photos.py
+    
+    # Override specific paths
+    python process_photos.py --source ~/Downloads/photos --db test.db
+    
+    # Use custom config file
+    python process_photos.py --config production.yaml
 """
 
 import argparse
@@ -12,8 +19,16 @@ from src.exif_parser import rename_and_organize
 from src.database import create_database, insert_image
 
 def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
-    """Main processing pipeline."""
+    """Main processing pipeline with duplicate checking.
     
+    Foundation note: Idempotent processing enables:
+    - Safe re-runs after interruptions
+    - Adding new photos without reprocessing existing
+    - Database recovery scenarios
+    """
+    print(f"\n{'='*60}")
+    print("PROCESSING PHOTOS")
+    print(f"{'='*60}")
     print(f"Processing photos from: {source_dir}")
     print(f"Organizing to: {output_dir}")
     print(f"Database: {db_path}\n")
@@ -21,19 +36,59 @@ def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
     # Create/connect to database
     conn = create_database(db_path)
     
+    # Check what's already been processed
+    cursor = conn.cursor()
+    cursor.execute("SELECT original_path FROM images")
+    already_processed = {row[0] for row in cursor.fetchall()}
+    
+    print(f"📊 Database contains {len(already_processed)} processed images\n")
+    
     # Process and organize files
+    # Note: Printing currently in exif_parser.py (layer separation fix deferred to Week 6)
     results = rename_and_organize(source_dir, output_dir)
     
-    # Insert into database
+    # Insert only new images
+    new_count = 0
+    skip_count = 0
+    MAX_SKIP_DISPLAY = 5  # Show first 5 skips, then summarize
+    
     for image_data in results:
+        # Check if already in database
+        if image_data['original_path'] in already_processed:
+            skip_count += 1
+            
+            # Show first few skips, then summarize rest
+            if skip_count <= MAX_SKIP_DISPLAY:
+                print(f"  ⏭️  Skip: {image_data['filename']}")
+            elif skip_count == MAX_SKIP_DISPLAY + 1:
+                remaining = len(results) - new_count - MAX_SKIP_DISPLAY
+                print(f"  ⏭️  ... and {remaining} more skipped")
+            
+            continue
+        
+        # Insert new image
         image_id = insert_image(conn, image_data)
-        print(f"  DB ID {image_id}: {image_data['filename']}")
+        new_count += 1
+        print(f"  ✅ DB ID {image_id}: {image_data['filename']}")
     
     conn.close()
     
-    print(f"\n✅Processed {len(results)} images")
-    print(f"✅ Organized into: {output_dir}")
-    print(f"✅ Database: {db_path}")
+    # Summary
+    print(f"\n{'='*60}")
+    print("Processing Complete")
+    print(f"{'='*60}")
+    print(f"✅ New images: {new_count}")
+    if skip_count > 0:
+        print(f"⏭️  Skipped (already processed): {skip_count}")
+    print(f"📊 Total in database: {len(already_processed) + new_count}")
+    
+    if new_count > 0:
+        print(f"📁 Organized into: {output_dir}")
+        print(f"🗄️  Database: {db_path}")
+    else:
+        print("⚠️  No new images processed")
+    print(f"{'='*60}")
+
 
 if __name__ == "__main__":
     """CLI entry point for photo processing.

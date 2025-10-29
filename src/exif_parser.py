@@ -111,29 +111,45 @@ def rename_and_organize(source_dir, dest_dir):
     dest = Path(dest_dir)
     
     # Supported formats
-    patterns = ['*.heic', '*.HEIC', '*.jpg', '*.JPG', '*.jpeg', '*.JPEG', '*.png', '*.PNG']
+    image_patterns = ['*.heic', '*.HEIC', '*.jpg', '*.JPG',
+                      '*.jpeg', '*.JPEG', '*.png', '*.PNG']
     
+    # Track ignored files
+    ignored_videos = []
+    ignored_metadata = []
+    ignored_other = []
+    
+    # Store results
     results = []
     
-    for pattern in patterns:
-        for img_path in source.glob(pattern):
+    # Process all files
+    for file_path in source.iterdir():
+        if not file_path.is_file():
+            continue
+        
+        suffix = file_path.suffix.lower()
+        
+        # Check if supported image
+        is_image = any(file_path.match(pattern) for pattern in image_patterns)
+        
+        if is_image:
             # Extract metadata
-            date, source_type = extract_exif_date(img_path)
-            camera = extract_camera_info(img_path)
+            date, source_type = extract_exif_date(file_path)
+            camera = extract_camera_info(file_path)
             
             # Generate organized path
-            rel_path = generate_organized_path(date, source_type, img_path.name)
+            rel_path = generate_organized_path(date, source_type, file_path.name)
             new_path = dest / rel_path
             
             # Create directory if needed
             new_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Copy file (don't delete original yet - safety)
-            shutil.copy2(img_path, new_path)
+            shutil.copy2(file_path, new_path)
             
             # Store result
             results.append({
-                'original_path': str(img_path),
+                'original_path': str(file_path),
                 'organized_path': str(new_path),
                 'filename': new_path.name,
                 'date_taken': date,
@@ -142,7 +158,24 @@ def rename_and_organize(source_dir, dest_dir):
                 'camera_model': camera['model']
             })
             
-            print(f"✅ {img_path.name} → {rel_path}")
+            # TODO: REMOVE prints from extraction later, just return data --> logging goes in orchestration `process_photos.py` or CLI script later  
+            print(f"📸 {file_path.name} → {new_path}")
+        
+        # Track ignore files
+        elif suffix in {'.mp4', '.mov', '.avi', '.mkv'}:
+            ignored_videos.append(file_path.name)
+        elif suffix in {'.csv', '.txt', '.json'}:
+            ignored_metadata.append(file_path.name)
+        else:
+            ignored_other.append(file_path.name)
+    
+    # Report ignore (at end, after all processing)
+    if ignored_videos:
+        print(f"\n📹 Skipped {len(ignored_videos)} video files")
+    if ignored_metadata:
+        print(f"📄 Skipped {len(ignored_metadata)} metadata files")
+    if ignored_other:
+        print(f"❓ Skipped {len(ignored_other)} other files")    
     
     return results
 
