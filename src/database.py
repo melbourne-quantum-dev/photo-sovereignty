@@ -37,10 +37,32 @@ def create_database(db_path="photo_archive.db"):
         ON images(camera_make, camera_model)
     """)
     
+    # Week 2: Locations table for GPS
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS locations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            altitude REAL,
+            FOREIGN KEY (image_id) REFERENCES images(id)
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_image_location 
+        ON locations(image_id)
+    """)
+    
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_coordinates 
+        ON locations(latitude, longitude)
+    """)
+    
     conn.commit()
     return conn
 
-
+# Image helper functions
 def insert_image(conn, image_data):
     """Insert image metadata into database.
     
@@ -119,6 +141,28 @@ def query_by_camera(conn, make=None, model=None):
     
     return cursor.fetchall()
 
+# GPS helper functions
+def insert_location(conn, image_id, lat, lon, alt=None):
+    """Insert GPS coordinates into locations table."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO locations (image_id, latitude, longitude, altitude)
+        VALUES (?, ?, ?, ?)
+    """, (image_id, lat, lon, alt))
+    conn.commit()
+    return cursor.lastrowid
+
+
+def query_images_without_gps(conn):
+    """Find images that haven't been GPS processed yet."""
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT i.id, i.organized_path 
+        FROM images i
+        LEFT JOIN locations l ON i.id = l.image_id
+        WHERE l.id IS NULL
+    """)
+    return cursor.fetchall()
 
 # Test
 if __name__ == "__main__":
