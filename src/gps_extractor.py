@@ -61,6 +61,10 @@ def extract_gps_coords(image_path):
         if lon_ref == 'W':
             lon = -lon
         
+        # Convert altitude to float
+        if altitude is not None:
+            altitude = float(altitude)
+        
         return (lat, lon, altitude)
         
     except Exception as e:
