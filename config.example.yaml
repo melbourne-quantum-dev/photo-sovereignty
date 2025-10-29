@@ -1,0 +1,14 @@
+.# config.example.yaml (committed to git)
+paths:
+  input_directory: ~/Pictures/phone_export
+  output_directory: ~/Pictures/organized
+  database: ~/Pictures/photo_archive.db
+  model_cache: ~/.cache/photo-sovereignty/models
+
+processing:
+  batch_size: 32
+  confidence_threshold: 0.5
+
+models:
+  yolo: yolov8m.pt
+  clip: ViT-L-14
