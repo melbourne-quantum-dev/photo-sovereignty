@@ -1,3 +1,12 @@
+# .gitignore
+# Personal configuration
+config.yaml
+
+# Private documentation
+docs/private/
+**/claude-instructions.md
+**/session-summaries/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -5,9 +14,15 @@ __pycache__/
 .venv/
 venv/
 
-# Data directories (if someone accidentally puts large data in project)
-data/full_export/
-data/large_datasets/
+# Sample data output
+data/organized*
+
+# Keep test organized output directory structure
+!data/organized/.gitkeep
+
+# For now, keep sample photos tracked (they're test fixtures)
+# data/sample_photos/*
+# !data/sample_photos/.gitkeep
 
 # Downloaded models (Week 3-4)
 models/
@@ -26,17 +41,3 @@ Thumbs.db
 *.db
 *.db-journal
 *.sqlite3
-
-# Organized output directories
-data/organized/*
-data/organized_test/*
-
-# Keep directory structure
-!data/organized/.gitkeep
-!data/organized_test/.gitkeep
-
-# Sample photos (optional - you might WANT these in git for testing)
-# For now, keep sample photos tracked (they're test fixtures)
-# data/sample_photos/*
-# !data/sample_photos/.gitkeep
-
