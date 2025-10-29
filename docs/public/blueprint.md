@@ -111,6 +111,7 @@ CREATE TABLE processing_status (
 -----
 
 ## PROJECT STRUCTURE
+TODO: add /src/config.py to mermaid
 
 ```
 photo-sovereignty/
@@ -606,7 +607,7 @@ confidence_thresholds:
 
 # Models
 models:
-  yolo: yolov8m.pt
+  yolo: yolo11m.pt
   clip: ViT-L-14
   clip_pretrained: laion2b_s32b_b82k
   ocr_languages: [en]

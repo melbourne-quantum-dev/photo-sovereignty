@@ -1,14 +1,54 @@
-.# config.example.yaml (committed to git)
+# config.example.yaml
+# Photo Sovereignty Pipeline - Configuration Template
+#
+# Setup Instructions:
+#   1. Copy this file: cp config.example.yaml config.yaml
+#   2. Edit config.yaml with your actual paths
+#   3. config.yaml is gitignored (keeps your paths private)
+#
+# This example file is committed to git for other users.
+# Your personal config.yaml should NEVER be committed.
+
 paths:
+  # Input directory containing unorganized photos
+  # Example: ~/Pictures/iphone_export or ~/Downloads/photo_archive
   input_directory: ~/Pictures/phone_export
+  
+  # Output directory for organized photos (creates year subdirectories)
+  # Example: ~/Pictures/organized or ~/Photos/archive
   output_directory: ~/Pictures/organized
+  
+  # SQLite database file path (stores metadata, GPS, object tags, embeddings)
+  # Example: ~/Pictures/photo_archive.db
   database: ~/Pictures/photo_archive.db
+  
+  # Cache directory for ML models (YOLO, CLIP, OCR)
+  # Example: ~/.cache/photo-sovereignty/models
   model_cache: ~/.cache/photo-sovereignty/models
 
 processing:
+  # Batch size for ML processing (adjust based on GPU memory)
+  # YOLO: 32 works on 12GB VRAM (RTX 3080)
+  # CLIP: 64 works on 12GB VRAM
   batch_size: 32
+  
+  # Confidence threshold for object detection (0.0 to 1.0)
+  # Higher = fewer false positives, lower = more detections
   confidence_threshold: 0.5
 
 models:
-  yolo: yolov8m.pt
+  # YOLOv8 model variant (yolov8n, yolov8s, yolov8m, yolov8l, yolov8x)
+  # Larger = more accurate but slower. yolov8m recommended.
+  yolo: yolo11m.pt
+  
+  # OpenCLIP model architecture
+  # ViT-L/14 recommended for best semantic search quality
   clip: ViT-L-14
+  
+  # OpenCLIP pretrained weights
+  # laion2b_s32b_b82k = trained on 2B image-text pairs
+  clip_pretrained: laion2b_s32b_b82k
+  
+  # EasyOCR language codes (add more as needed)
+  # Example: ['en', 'es'] for English + Spanish
+  ocr_languages: ['en']

@@ -1,14 +1,39 @@
-# Default paths (can be overridden by CLI arguments)
+# config.yaml
+# Photo Sovereignty Pipeline - Personal Configuration
+#
+# THIS FILE IS GITIGNORED - Your personal paths stay private
+# Edit these paths to match your system
 
 paths:
+  # Input directory containing unorganized iPhone photos
   input_directory: ~/data/media/images/IPHONE
-  output_database: ~/data/photo_archives/photo_archive.db
+  
+  # Output directory for organized photos
+  # Note: Currently using subdirectory for mouse warfare documentation
+  output_directory: ~/data/media/images/organised/iphone_mouse_warfare
+  
+  # SQLite database file path
+  database: ~/data/media/images/organised/photo_archive.db
+  
+  # Cache directory for ML models
   model_cache: ~/data/photo_archives/models
 
 processing:
+  # Batch size for ML processing (RTX 3080 = 12GB VRAM)
   batch_size: 32
+  
+  # Confidence threshold for object detection
   confidence_threshold: 0.5
 
 models:
-  yolo: yolov8m.pt
+  # YOLOv8 medium variant (balance of speed/accuracy)
+  yolo: yolo11m.pt
+  
+  # OpenCLIP vision transformer (best semantic search)
   clip: ViT-L-14
+  
+  # OpenCLIP pretrained on LAION-2B dataset
+  clip_pretrained: laion2b_s32b_b82k
+  
+  # OCR languages (English only for now)
+  ocr_languages: ['en']
