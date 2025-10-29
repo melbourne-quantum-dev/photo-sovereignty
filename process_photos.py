@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+from pathlib import Path
 from src.exif_parser import rename_and_organize
 from src.database import create_database, insert_image
 
@@ -30,16 +31,88 @@ def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
     
     conn.close()
     
-    print(f"\n✅ Processed {len(results)} images")
+    print(f"\n✅Processed {len(results)} images")
     print(f"✅ Organized into: {output_dir}")
     print(f"✅ Database: {db_path}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process photo archive")
-    parser.add_argument("--source", required=True, help="Source directory with photos")
-    parser.add_argument("--output", required=True, help="Output directory for organized photos")
-    parser.add_argument("--db", default="photo_archive.db", help="Database file path")
+    """CLI entry point for photo processing.
+    
+    Configuration Loading:
+        Loads paths from config.yaml by default. CLI arguments override config values.
+        This enables privacy-preserving development (config.yaml gitignored) while
+        maintaining flexible CLI interface for testing/debugging.
+    
+    Examples:
+        # Use config.yaml paths (recommended)
+        python process_photos.py
+        
+        # Override specific paths
+        python process_photos.py --source ~/Downloads/photos --db test.db
+        
+        # Use custom config file
+        python process_photos.py --config production.yaml
+    """
+    from src.config import load_config
+    
+    parser = argparse.ArgumentParser(
+        description="Process photo archive: Extract EXIF, organize files, store metadata",
+        epilog="""
+        Privacy Note: Paths loaded from config.yaml (gitignored).
+        CLI arguments override config values when provided.
+        """
+    )
+    
+    # Config file selection
+    parser.add_argument(
+        "--config",
+        default="config.yaml",
+        help="Path to configuration file (default: config.yaml)"
+    )
+    
+    # Path overrides (optional - use config if not provided)
+    parser.add_argument(
+        "--source",
+        help="Source directory with photos (overrides config)"
+    )
+    parser.add_argument(
+        "--output",
+        help="Output directory for organized photos (overrides config)"
+    )
+    parser.add_argument(
+        "--db",
+        help="Database file path (overrides config)"
+    )
     
     args = parser.parse_args()
     
-    process_photos(args.source, args.output, args.db)
+    # Load configuration
+    try:
+        config = load_config(args.config)
+    except FileNotFoundError as e:
+        print(f"❌ {e}")
+        exit(1)
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        exit(1)
+    
+    # Use CLI args if provided, otherwise use config
+    source_dir = args.source if args.source else config['paths']['input_directory']
+    output_dir = args.output if args.output else config['paths']['output_directory']
+    db_path = args.db if args.db else config['paths']['database']
+    
+    # Expand paths if provided via CLI
+    if args.source:
+        source_dir = Path(source_dir).expanduser()
+    if args.output:
+        output_dir = Path(output_dir).expanduser()
+    if args.db:
+        db_path = Path(db_path).expanduser()
+    
+    # Validate source directory exists
+    if not source_dir.exists():
+        print(f"❌ Source directory not found: {source_dir}")
+        exit(1)
+    
+    # Run processing
+    process_photos(str(source_dir), str(output_dir), str(db_path))
