@@ -14,14 +14,14 @@ capabilities (iCloud, Google Photos) while maintaining complete data sovereignty
 
 ## In Progress
 
-🚧 YOLOv8 object detection (80 COCO classes)
+🚧 YOLO11m SOTA object detection (80 COCO classes)
 🚧 OpenCLIP semantic embeddings (natural language search)
 🚧 EasyOCR text extraction
 🚧 Unified query interface
 
 ## Technical Stack
 
-Python 3.10+, SQLite, Pillow, YOLOv8 (pending), OpenCLIP (pending), EasyOCR (pending)
+Python 3.10+, SQLite, Pillow, YOLO11 (pending), OpenCLIP (pending), EasyOCR (pending)
 
 ## Architecture
 
