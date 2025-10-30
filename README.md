@@ -7,17 +7,17 @@ capabilities (iCloud, Google Photos) while maintaining complete data sovereignty
 
 ## Current Features
 
-✅ EXIF metadata extraction and file organization (535 images processed)
-✅ GPS coordinate extraction and storage
-✅ SQLite database with incremental schema evolution
-✅ Privacy-preserving architecture (local processing, no cloud APIs)
+- ✅ EXIF metadata extraction and file organization (535 images processed)
+- ✅ GPS coordinate extraction and storage
+- ✅ SQLite database with incremental schema evolution
+- ✅ Privacy-preserving architecture (local processing, no cloud APIs)
 
 ## In Progress
 
-🚧 YOLO11m SOTA object detection (80 COCO classes)
-🚧 OpenCLIP semantic embeddings (natural language search)
-🚧 EasyOCR text extraction
-🚧 Unified query interface
+- 🚧 YOLO11m SOTA object detection (80 COCO classes)
+- 🚧 OpenCLIP semantic embeddings (natural language search)
+- 🚧 EasyOCR text extraction
+- 🚧 Unified query interface
 
 ## Technical Stack
 
@@ -29,7 +29,7 @@ Three-layer design: extraction (pure functions) → persistence (database.py)
 → orchestration (CLI scripts). Built for incremental feature addition and 
 idempotent processing.
 
-[Link to ARCHITECTURE.md for details]
+[Link to ARCHITECTURE.md for details](ARCHITECTURE.md)
 
 ## Portfolio Context
 
