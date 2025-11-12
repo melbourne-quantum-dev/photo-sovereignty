@@ -31,6 +31,11 @@ idempotent processing.
 
 [Link to ARCHITECTURE.md for details](ARCHITECTURE.md)
 
+## Testing
+
+The `data/sample_photos/` directory is for test fixtures.
+Add your own test images here (gitignored by default).
+
 ## Portfolio Context
 
 This project demonstrates legal-tech relevant capabilities:

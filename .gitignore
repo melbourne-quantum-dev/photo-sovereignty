@@ -13,31 +13,38 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+*.egg-info/
 
-# Sample data output
-data/organized*
+# Data directory - privacy-first approach
+# All contents gitignored except directory structure
+data/sample_photos/*
+data/organized_test/*
+data/*.db
+data/*.db-journal
+data/*.sqlite3
 
-# Keep test organized output directory structure
-!data/organized/.gitkeep
-
-# For now, keep sample photos tracked (they're test fixtures)
-# data/sample_photos/*
-# !data/sample_photos/.gitkeep
+# Preserve directory structure only
+!data/sample_photos/.gitkeep
+!data/organized_test/.gitkeep
 
 # Downloaded models (Week 3-4)
 models/
 *.pt
 *.pth
+*.onnx
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+*.log
 
-# Database files (keep test dbs out of git)
+# Database files (catch-all for any location)
 *.db
 *.db-journal
 *.sqlite3
