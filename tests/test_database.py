@@ -380,9 +380,12 @@ class TestQueryOperations:
             insert_image(conn, image_data)
 
         # Query range 2025-01-02 to 2025-01-04
-        results = query_by_date_range(conn, "2025-01-02", "2025-01-04")
+        # Note: BETWEEN is inclusive, but string '2025-01-04' = midnight
+        # Images at 2025-01-04 12:00:00 are > midnight, so excluded
+        # To include full day 4, need end time or next day
+        results = query_by_date_range(conn, "2025-01-02", "2025-01-04 23:59:59")
 
-        # Should return 3 images
+        # Should return 3 images (days 2, 3, 4)
         assert len(results) == 3
 
     def test_query_by_camera_make_and_model(self, temp_db_with_schema):

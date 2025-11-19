@@ -6,6 +6,7 @@ config.yaml
 docs/private/
 **/claude-instructions.md
 **/session-summaries/
+CLAUDE.local.md
 
 # Python
 __pycache__/
@@ -17,7 +18,7 @@ venv/
 
 # Testing & Coverage
 .pytest_cache/
-htmlcov/
+htmlcov/s
 .coverage
 *.cover
 

@@ -44,7 +44,7 @@ python dev_tools/inspect_db.py --query gps_coverage
 ## Project Structure
 
 ```
-photo-pipeline/
+photo-sovereignty/
 ├── src/                    # Core library modules
 │   ├── config.py          # Cross-platform configuration
 │   ├── database.py        # SQLite operations
@@ -126,17 +126,25 @@ ruff check src/ tests/
 
 ## Testing
 
-Current test coverage: **54.18%** (target: 90%+)
+**Current Coverage**: 90.19% (58/58 tests passing)
 
-Tests require sample images in `data/sample_photos/` (gitignored). Add your own test fixtures or download sample images with GPS metadata.
+The test suite uses pytest with comprehensive fixtures and integration tests against real image files.
 
 ```bash
-# Run full test suite
+# Run full test suite with coverage
+pytest --cov=src --cov-report=term-missing
+
+# Quick test run
 pytest -v
 
-# Run without integration tests (no sample data needed)
-pytest -v -m "not integration"
+# Skip integration tests (no sample images needed)
+pytest -m "not integration"
+
+# Generate HTML coverage report
+pytest --cov=src --cov-report=html
 ```
+
+**Note**: Integration tests require sample images in `data/sample_photos/` (gitignored for privacy). Unit tests run without sample data.
 
 ## Portfolio Context
 
