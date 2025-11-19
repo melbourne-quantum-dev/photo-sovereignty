@@ -234,14 +234,16 @@ open htmlcov/index.html
 - **Docstrings**: Google-style for public functions
 - **Comments**: For non-obvious logic only
 - **Formatting**: Ruff (configured in pyproject.toml)
-- **Line length**: 100 characters
+- **Line length**: 88 characters (ruff default)
 - **Testing**: Pytest with >90% coverage target
+- **Python version**: 3.11+ (3.10 nearing EOL)
 
 ### Git Workflow
 
-- **Conventional commits**: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
+- **Conventional commits**: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `ci:`, `style:`
 - **Tags**: Annotated tags for releases (`git tag -a v0.1.0 -m "message"`)
 - **Commit messages**: Clear, descriptive, reference issues when applicable
+- **Pre-commit hooks**: Run `pre-commit install` for automatic linting
 
 ### Package Management
 
@@ -249,6 +251,40 @@ open htmlcov/index.html
 - **Alternative**: `pip install -e ".[dev]"`
 - **Dependencies**: Defined in `pyproject.toml`
 - **Optional groups**: `[dev]`, `[stage3]`, `[stage4]`, `[stage5]`
+
+### CI/CD
+
+**GitHub Actions workflows**:
+
+1. **`.github/workflows/ci.yml`** - Main CI pipeline:
+   - Runs on push to `main` and all PRs
+   - Lint job: `ruff check` and `ruff format --check`
+   - Test job: Matrix testing on Python 3.11 and 3.12
+   - Unit tests only (integration tests skipped - no sample images in CI)
+   - Coverage uploaded to Codecov (Python 3.11 only)
+
+2. **`.github/workflows/pre-commit.yml`** - Pre-commit validation:
+   - Runs on PRs to ensure code quality
+   - Executes all pre-commit hooks
+
+**Local pre-commit setup** (optional but recommended):
+```bash
+# Install pre-commit hooks
+uv pip install pre-commit
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+```
+
+**Pre-commit hooks** (`.pre-commit-config.yaml`):
+- Ruff linting with auto-fix
+- Ruff formatting
+- Trailing whitespace removal
+- End-of-file fixer
+- YAML validation
+- Large file detection (max 1MB)
+- Merge conflict detection
 
 ---
 
