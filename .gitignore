@@ -15,6 +15,12 @@ __pycache__/
 venv/
 *.egg-info/
 
+# Testing & Coverage
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+
 # Data directory - privacy-first approach
 # All contents gitignored except directory structure
 data/sample_photos/*

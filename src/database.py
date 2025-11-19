@@ -163,29 +163,3 @@ def query_images_without_gps(conn):
         WHERE l.id IS NULL
     """)
     return cursor.fetchall()
-
-# Test
-if __name__ == "__main__":
-    # Create test database
-    conn = create_database("test_archive.db")
-    
-    # Insert test record
-    test_data = {
-        'original_path': '/path/to/IMG_3630.HEIC',
-        'organized_path': '2025/2025-06-02_001524.heic',
-        'filename': '2025-06-02_001524.heic',
-        'date_taken': datetime(2025, 6, 2, 0, 15, 24),
-        'date_source': 'exif_datetime_camera',
-        'camera_make': 'Apple',
-        'camera_model': 'iPhone 15 Pro'
-    }
-    
-    image_id = insert_image(conn, test_data)
-    print(f"✅ Inserted image ID: {image_id}")
-    
-    # Query it back
-    results = query_by_camera(conn, make='Apple')
-    print(f"✅ Found {len(results)} Apple photos")
-    
-    conn.close()
-    

@@ -6,49 +6,70 @@
 #   2. Edit config.yaml with your actual paths
 #   3. config.yaml is gitignored (keeps your paths private)
 #
-# This example file is committed to git for other users.
-# Your personal config.yaml should NEVER be committed.
+# v0.1.0 Note: This config file is now OPTIONAL. If not present, the application
+# uses platform-appropriate defaults via platformdirs:
+#   Linux: ~/.config/photo-pipeline/, ~/.local/share/photo-pipeline/
+#   macOS: ~/Library/Application Support/photo-pipeline/
+#   Windows: %APPDATA%/photo-pipeline/
+#
+# Create this file only if you need custom paths different from the defaults.
 
 paths:
   # Input directory containing unorganized photos
-  # Example: ~/Pictures/iphone_export or ~/Downloads/photo_archive
-  input_directory: ~/Pictures/phone_export
-  
+  # Default: ~/Pictures (or %USERPROFILE%\Pictures on Windows)
+  # Uncomment and customize if needed:
+  # input_directory: ~/Pictures/phone_export
+
   # Output directory for organized photos (creates year subdirectories)
-  # Example: ~/Pictures/organized or ~/Photos/archive
-  output_directory: ~/Pictures/organized
-  
+  # Default (Linux): ~/.local/share/photo-pipeline/organized
+  # Default (macOS): ~/Library/Application Support/photo-pipeline/organized
+  # Default (Windows): %APPDATA%/photo-pipeline/organized
+  # Uncomment and customize if needed:
+  # output_directory: ~/Pictures/organized
+
   # SQLite database file path (stores metadata, GPS, object tags, embeddings)
-  # Example: ~/Pictures/photo_archive.db
-  database: ~/Pictures/photo_archive.db
-  
+  # Default (Linux): ~/.local/share/photo-pipeline/photo_archive.db
+  # Default (macOS): ~/Library/Application Support/photo-pipeline/photo_archive.db
+  # Default (Windows): %APPDATA%/photo-pipeline/photo_archive.db
+  # Uncomment and customize if needed:
+  # database: ~/Pictures/photo_archive.db
+
   # Cache directory for ML models (YOLO, CLIP, OCR)
-  # Example: ~/.cache/photo-sovereignty/models
-  model_cache: ~/.cache/photo-sovereignty/models
+  # Default (Linux): ~/.cache/photo-pipeline/models
+  # Default (macOS): ~/Library/Caches/photo-pipeline/models
+  # Default (Windows): %LOCALAPPDATA%/photo-pipeline/Cache/models
+  # Uncomment and customize if needed:
+  # model_cache: ~/.cache/photo-pipeline/models
 
 processing:
   # Batch size for ML processing (adjust based on GPU memory)
   # YOLO: 32 works on 12GB VRAM (RTX 3080)
   # CLIP: 64 works on 12GB VRAM
+  # Default: 32
   batch_size: 32
-  
+
   # Confidence threshold for object detection (0.0 to 1.0)
   # Higher = fewer false positives, lower = more detections
+  # Default: 0.5
   confidence_threshold: 0.5
 
 models:
-  # YOLOv8 model variant (yolov8n, yolov8s, yolov8m, yolov8l, yolov8x)
-  # Larger = more accurate but slower. yolov8m recommended.
+  # YOLOv11 model variant (yolo11n, yolo11s, yolo11m, yolo11l, yolo11x)
+  # Larger = more accurate but slower. yolo11m recommended.
+  # Default: yolo11m.pt
   yolo: yolo11m.pt
-  
+
   # OpenCLIP model architecture
   # ViT-L/14 recommended for best semantic search quality
+  # Default: ViT-L-14
   clip: ViT-L-14
-  
+
   # OpenCLIP pretrained weights
   # laion2b_s32b_b82k = trained on 2B image-text pairs
+  # Default: laion2b_s32b_b82k
   clip_pretrained: laion2b_s32b_b82k
-  
+
   # EasyOCR language codes (add more as needed)
   # Example: ['en', 'es'] for English + Spanish
-  ocr_languages: ['en']
+  # Default: ['en']
+  ocr_languages: ["en"]

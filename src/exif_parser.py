@@ -179,14 +179,3 @@ def rename_and_organize(source_dir, dest_dir):
     
     return results
 
-if __name__ == "__main__":
-    # Test organization logic (dry run - copies to test output)
-    results = rename_and_organize(
-        "data/sample_photos",
-        "data/organized_test"
-    )
-    
-    print(f"\nProcessed {len(results)} images")
-    for r in results:
-        print(f"{r['filename']}: {r['date_source']}")
-        
