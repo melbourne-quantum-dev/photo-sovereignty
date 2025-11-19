@@ -21,7 +21,7 @@ Relationship with gps_extractor.py
   - extract_gps_coords(): Returns (lat, lon, alt) tuple or None
   - convert_to_degrees(): DMS → decimal conversion
   - No database operations, no file I/O side effects
-  
+
 - **extract_gps.py** (this file): Orchestration layer
   - Queries database for images needing GPS extraction
   - Calls gps_extractor functions for each image
@@ -50,7 +50,7 @@ Examples
 --------
     # Extract GPS from all unprocessed images
     python extract_gps.py --db photo_archive.db
-    
+
     # Run on specific database (absolute path)
     python extract_gps.py --db /path/to/archive/photo_archive.db
 
@@ -68,38 +68,39 @@ Stage: Week 2 - GPS Extraction
 
 import argparse
 from pathlib import Path
-from src.gps_extractor import extract_gps_coords
-from src.database import create_database, query_images_without_gps, insert_location
+
 from src.config import load_config
+from src.database import create_database, insert_location, query_images_without_gps
+from src.gps_extractor import extract_gps_coords
 
 
 def extract_gps(db_path):
     """Main GPS extraction pipeline.
-    
+
     Orchestrates the complete GPS extraction workflow:
     1. Connect to database (creates locations table if needed)
     2. Query images without GPS data (LEFT JOIN on locations table)
     3. Extract GPS coordinates from each image file
     4. Insert coordinates into locations table
     5. Report extraction statistics
-    
+
     This function is idempotent - safe to run multiple times. Only processes
     images that don't have existing location records. This enables:
     - Resume after interruption (crash, manual stop)
     - Add new photos without reprocessing existing
     - Fix extraction bugs and re-run on affected images only
-    
+
     Args:
         db_path (Path): Path to photo archive SQLite database.
-    
+
     Returns:
         int: Number of images successfully processed with GPS extraction.
-    
+
     Side Effects:
         - Creates locations table if not exists (via create_database)
         - Inserts GPS coordinates into database (via insert_location)
         - Prints progress messages to stdout
-    
+
     Example:
         >>> db = Path("photo_archive.db")
         >>> success_count = extract_gps(db)
@@ -108,49 +109,49 @@ def extract_gps(db_path):
         ...
         >>> print(f"Extracted GPS from {success_count} images")
         Extracted GPS from 489 images
-    
+
     Notes:
         - Images without GPS data are skipped (not errors)
         - Extraction errors logged but don't stop batch processing
         - Uses gps_extractor.py for actual coordinate extraction
         - Uses database.py for all database operations
     """
-    print(f"GPS Extraction Pipeline")
+    print("GPS Extraction Pipeline")
     print(f"Database: {db_path}\n")
-    
+
     # Step 1: Connect and ensure locations table exists
     # Foundation note: create_database() is idempotent - creates table if missing,
     # otherwise just returns connection. This enables running stages independently.
     conn = create_database(db_path)
-    
+
     # Step 2: Find images needing GPS extraction
     # Uses LEFT JOIN to find images.id where locations.image_id IS NULL
     # This query pattern enables incremental processing across all stages
     images_to_process = query_images_without_gps(conn)
-    
+
     if not images_to_process:
         print("✅ All images already have GPS data (or none available)")
         conn.close()
         return 0
-    
+
     print(f"Processing {len(images_to_process)} images for GPS extraction...\n")
-    
+
     # Step 3: Extract GPS from each image
     success_count = 0
     no_gps_count = 0
     error_count = 0
-    
+
     for image_id, org_path in images_to_process:
         try:
             # Call extraction layer (pure function, no side effects)
             coords = extract_gps_coords(org_path)
-            
+
             if coords:
                 lat, lon, alt = coords
-                
+
                 # Call persistence layer (database.py handles SQL)
                 insert_location(conn, image_id, lat, lon, alt)
-                
+
                 # Progress indicator with rounded altitude display
                 filename = Path(org_path).name
                 alt_str = f", {alt:.2f}m" if alt else ""
@@ -160,86 +161,86 @@ def extract_gps(db_path):
                 # Not an error - image just lacks GPS data
                 # (Location services off, screenshot, edited photo, etc.)
                 no_gps_count += 1
-                
+
         except Exception as e:
             # Log error but continue processing other images
             print(f"❌ Error processing image {image_id}: {e}")
             error_count += 1
-    
+
     conn.close()
-    
+
     # Step 4: Report statistics
     total = len(images_to_process)
     gps_percentage = (success_count / total * 100) if total > 0 else 0
-    
-    print(f"\n{'='*60}")
-    print(f"GPS Extraction Complete")
-    print(f"{'='*60}")
+
+    print(f"\n{'=' * 60}")
+    print("GPS Extraction Complete")
+    print(f"{'=' * 60}")
     print(f"✅ GPS extracted: {success_count}/{total} images ({gps_percentage:.1f}%)")
     print(f"⏭️  No GPS data: {no_gps_count} images")
-    
+
     if error_count > 0:
         print(f"❌ Errors: {error_count} images")
-    
-    print(f"{'='*60}")
-    
+
+    print(f"{'=' * 60}")
+
     return success_count
 
 
 if __name__ == "__main__":
     """CLI entry point for GPS extraction.
-    
+
     Configuration Loading:
         Loads database path from config.yaml by default. CLI --db argument
         overrides config value. Enables privacy-preserving development while
         maintaining testing flexibility.
-    
+
     Development Note:
         This is a standalone CLI script during Week 2-5 development.
         In Week 6-7, this functionality will be integrated into main.py
         as a subcommand: `python main.py process --stage gps`
-        
+
         The extraction and database modules remain unchanged during refactoring;
         only the CLI interface is unified. This demonstrates clean architectural
         boundaries and modular -> unified development workflow.
-    
+
     Examples:
         # Use config.yaml database path (recommended)
         python extract_gps.py
-        
+
         # Override database path
         python extract_gps.py --db ~/test/photo_archive.db
-        
+
         # Use custom config file
         python extract_gps.py --config production.yaml
     """
-    
+
     parser = argparse.ArgumentParser(
         description="Extract GPS coordinates from photos and store in database",
         epilog="""
         Foundation Note: This script processes only images without existing GPS data.
         Safe to run multiple times - enables incremental processing and error recovery.
-        
+
         Privacy Note: Database path loaded from config.yaml (gitignored).
         CLI --db argument overrides config when provided.
-        """
+        """,
     )
-    
+
     # Config file selection
     parser.add_argument(
         "--config",
         default="config.yaml",
-        help="Path to configuration file (default: config.yaml)"
+        help="Path to configuration file (default: config.yaml)",
     )
-    
+
     # Database path override (optional - use config if not provided)
     parser.add_argument(
-        "--db", 
-        help="Path to photo archive database (overrides config, supports ~ expansion)"
+        "--db",
+        help="Path to photo archive database (overrides config, supports ~ expansion)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Load configuration
     try:
         config = load_config(args.config)
@@ -249,18 +250,18 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Error loading config: {e}")
         exit(1)
-    
+
     # Use CLI arg if provided, otherwise use config
     if args.db:
         db_path = Path(args.db).expanduser()
     else:
-        db_path = config['paths']['database']
-    
+        db_path = config["paths"]["database"]
+
     # Validate database exists
     if not db_path.exists():
         print(f"❌ Database not found: {db_path}")
         print("Run process_photos.py first to create database")
         exit(1)
-    
+
     # Run extraction pipeline
     extract_gps(db_path)

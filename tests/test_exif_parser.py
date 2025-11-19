@@ -63,7 +63,7 @@ class TestExifDateExtraction:
 
             if date_info:
                 date, source = date_info
-                assert isinstance(date, datetime), f"Date should be datetime object"
+                assert isinstance(date, datetime), "Date should be datetime object"
                 # All possible date sources from extract_exif_date()
                 valid_sources = [
                     "exif",

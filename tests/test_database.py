@@ -14,10 +14,7 @@ Author: Leonardo
 Version: v0.1.0
 """
 
-import sqlite3
 from datetime import datetime
-
-import pytest
 
 from src.database import (
     create_database,
@@ -241,7 +238,7 @@ class TestIdempotency:
         }
 
         # Insert first time
-        id1 = insert_image(conn, image_data)
+        insert_image(conn, image_data)
 
         # Check if already processed (this is what process_photos.py does)
         cursor = conn.cursor()

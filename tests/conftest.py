@@ -15,14 +15,14 @@ Version: v0.1.0
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Generator
+from typing import Any
 
 import pytest
 
 # Import modules to test
-from src.config import load_config
 from src.database import create_database
 
 
@@ -180,7 +180,7 @@ def sample_png(sample_photos_dir: Path) -> Path:
 
 
 @pytest.fixture
-def mock_config(temp_dir: Path, temp_db: Path) -> Dict[str, Any]:
+def mock_config(temp_dir: Path, temp_db: Path) -> dict[str, Any]:
     """Create a mock configuration for testing.
 
     Args:
@@ -216,7 +216,7 @@ def mock_config(temp_dir: Path, temp_db: Path) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_image_data() -> Dict[str, Any]:
+def sample_image_data() -> dict[str, Any]:
     """Create sample image metadata for database testing.
 
     Returns:

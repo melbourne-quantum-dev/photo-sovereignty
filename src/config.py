@@ -19,7 +19,7 @@ Architecture:
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from platformdirs import user_cache_dir, user_config_dir, user_data_dir
@@ -44,7 +44,7 @@ def get_default_config_path() -> Path:
     return config_dir / "config.yaml"
 
 
-def get_default_paths() -> Dict[str, Path]:
+def get_default_paths() -> dict[str, Path]:
     """Get platform-appropriate default paths for data storage.
 
     Provides sensible defaults using platformdirs when config.yaml doesn't exist
@@ -81,7 +81,7 @@ def get_default_paths() -> Dict[str, Path]:
     }
 
 
-def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+def load_config(config_path: str | None = None) -> dict[str, Any]:
     """Load configuration from YAML file with path expansion and validation.
 
     Loads user-specific configuration including paths, processing parameters,
@@ -161,7 +161,7 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     # If config exists, load it
     if config_file:
         try:
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 config = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
             raise yaml.YAMLError(
@@ -170,7 +170,7 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
                 f"- Incorrect indentation (use 2 spaces)\n"
                 f"- Missing colons after keys\n"
                 f"- Unquoted special characters"
-            )
+            ) from e
     else:
         # No config file - start with empty config, will use defaults
         config = {}
@@ -207,7 +207,7 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     return config
 
 
-def get_path(config: Dict[str, Any], path_key: str) -> Path:
+def get_path(config: dict[str, Any], path_key: str) -> Path:
     """Get a specific path from config with validation.
 
     Helper function to extract and validate individual paths from config dict.
@@ -245,4 +245,3 @@ def get_path(config: Dict[str, Any], path_key: str) -> Path:
         )
 
     return config["paths"][path_key]
-

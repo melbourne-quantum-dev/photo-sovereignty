@@ -1,5 +1,4 @@
 # src/gps_extractor.py
-from pathlib import Path
 
 from PIL import Image
 from pillow_heif import register_heif_opener
@@ -71,5 +70,3 @@ def extract_gps_coords(image_path):
     except Exception as e:
         print(f"Error extracting GPS from {image_path}: {e}")
         return None
-
-

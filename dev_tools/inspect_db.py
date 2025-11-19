@@ -33,7 +33,6 @@ import argparse
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Add src to path for config loading
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -73,7 +72,7 @@ def show_schema(conn: sqlite3.Connection):
 def show_all_images(conn: sqlite3.Connection, limit: int = 20):
     """Display all images in database."""
     cursor = conn.cursor()
-    cursor.execute(f"SELECT COUNT(*) FROM images")
+    cursor.execute("SELECT COUNT(*) FROM images")
     total = cursor.fetchone()[0]
 
     cursor.execute(f"""
@@ -255,12 +254,12 @@ def show_coord_ranges(conn: sqlite3.Connection):
         abs(max_lon - min_lon) * 111 * abs(avg_lat / 90)
     )  # Adjust for latitude
 
-    print(f"\nGeographic spread:")
+    print("\nGeographic spread:")
     print(f"  North-South: {lat_span_km:.2f}km")
     print(f"  East-West: {lon_span_km:.2f}km")
 
     if min_alt and max_alt and avg_alt:
-        print(f"\nAltitude statistics:")
+        print("\nAltitude statistics:")
         print(f"  Range: {min_alt:.2f}m to {max_alt:.2f}m")
         print(f"  Average: {avg_alt:.2f}m")
 
@@ -310,7 +309,7 @@ QUERIES = {
 
 def run_all_queries(conn: sqlite3.Connection):
     """Run all queries in sequence."""
-    for query_name, (description, query_func) in QUERIES.items():
+    for _query_name, (_description, query_func) in QUERIES.items():
         query_func(conn)
 
 
@@ -363,10 +362,10 @@ def main():
             print(f"\n🔍 Running query: {description}")
             query_func(conn)
         else:
-            print(f"\n🔍 Running all database queries...")
+            print("\n🔍 Running all database queries...")
             run_all_queries(conn)
 
-        print(f"✅ Database inspection complete\n")
+        print("✅ Database inspection complete\n")
 
     except Exception as e:
         print(f"❌ Error: {e}")
