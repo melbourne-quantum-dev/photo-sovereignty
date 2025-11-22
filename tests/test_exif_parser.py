@@ -301,14 +301,31 @@ class TestFilenamePreservation:
         assert not _is_descriptive_name("0fe5236c-65a4-4c6d-bf41-b262781290c1")
         assert not _is_descriptive_name("9a87b2f5-d315-45bd-afa7-d115da25ab2f")
 
+        # Pure timestamp screenshots (should return False - no context)
+        assert not _is_descriptive_name("Screenshot 2025-07-06 121830")
+        assert not _is_descriptive_name("Screenshot 2025-06-30 045143")
+        assert not _is_descriptive_name("Screenshot 2025-07-09 at 15-34-31")
+
+        # Pure date+time only (should return False - no description)
+        assert not _is_descriptive_name("2025-09-02 200936")
+
         # Descriptive names (should return True)
         assert _is_descriptive_name("piazza-dei-signori")
         assert _is_descriptive_name("wedding-reception")
-        assert _is_descriptive_name("birthday-party-2023")
+        assert _is_descriptive_name("birthday-party-2023")  # partial date in context
         assert _is_descriptive_name("vacation_beach")
         assert _is_descriptive_name("daisy_cow")
         assert _is_descriptive_name("dris")
         assert _is_descriptive_name("england-london-bridge")
+
+        # Screenshots with descriptions (should return True - has context!)
+        assert _is_descriptive_name("2025-09-02 200936 game build settings")
+        assert _is_descriptive_name(
+            "Screenshot 2025-03-29 at 18-38-44 Research Article on Machine Learning"
+        )
+        assert _is_descriptive_name(
+            "Screenshot 2025-05-02 at 18-35-52 Music Playlist Summer Mix"
+        )
 
     def test_preserve_descriptive_only(self):
         """Default behavior: preserve descriptive names, strip camera names."""

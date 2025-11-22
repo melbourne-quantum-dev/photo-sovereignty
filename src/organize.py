@@ -24,8 +24,13 @@ def _is_descriptive_name(stem: str) -> bool:
 
     Camera-generated patterns include:
     - IMG_1234, DSC01234, DSCN1234
-    - 20231215_143022 (date-based)
-    - Screenshot patterns
+    - Pure timestamp screenshots (Screenshot 2025-07-06 121830)
+    - Date-only filenames (2023-12-15_143022)
+
+    Descriptive patterns (preserved):
+    - Screenshots with context (Screenshot 2025-03-29 at 18-38-44 Open Deep-Research...)
+    - Date + description (2025-09-02 200936 holy grasp of undying zed)
+    - Partial dates in context (birthday-2023, vacation-dec-2024)
 
     Args:
         stem: Filename without extension
@@ -35,16 +40,17 @@ def _is_descriptive_name(stem: str) -> bool:
     """
     import re
 
-    # Camera and auto-generated patterns
+    # Pure camera/auto-generated patterns (NO additional descriptive content)
     camera_patterns = [
         r"^IMG_\d+$",  # IMG_1234
         r"^DSC[N]?\d+$",  # DSC01234, DSCN1234
-        r"^\d{8}_\d{6}$",  # 20231215_143022
+        r"^\d{8}_\d{6}$",  # 20231215_143022 (pure timestamp)
         r"^\d{4}-\d{2}-\d{2}_\d{6}$",  # 2023-12-15_143022 (already organized)
         r"^IMG-\d+",  # IMG-20231215-WA0001
         r"^PXL_",  # Pixel phone format (PXL_20231215_143022)
-        r"^Screenshot",  # Screenshot_...
-        r"^\d{4}-\d{2}-\d{2}",  # Starts with date
+        r"^Screenshot \d{4}-\d{2}-\d{2}(( at)? \d{2}[:-]?\d{2}[:-]?\d{2})?$",  # Screenshot 2025-07-06 121830 or at 12:18:30 (no description)
+        r"^Screenshot_\d+$",  # Screenshot_20231215
+        r"^\d{4}-\d{2}-\d{2} \d{6}$",  # 2025-09-02 200936 (pure timestamp, no description)
         r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",  # iCloud UUID exports
     ]
 
