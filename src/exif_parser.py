@@ -1,5 +1,17 @@
 # src/exif_parser.py
-import shutil
+"""EXIF metadata extraction from image files.
+
+This module handles:
+- Date extraction from EXIF metadata
+- Camera information extraction
+- Support for HEIC, JPEG, and PNG formats
+
+Separation of concerns:
+- Pure extraction logic - no file organization
+- No user-facing output - returns data or None
+- Orchestration layer handles progress reporting and error messages
+"""
+
 from datetime import datetime
 from pathlib import Path
 
@@ -15,7 +27,17 @@ def extract_exif_date(image_path):
 
     iPhone USB extraction: DateTime (306) is capture time.
 
-    Returns: tuple (datetime, source_type)
+    Args:
+        image_path: Path to image file (str or Path)
+
+    Returns:
+        tuple: (datetime, source_type) or (None, None) on error
+
+    Source types:
+        - 'exif_original': EXIF DateTimeOriginal tag (36867)
+        - 'exif_datetime_camera': EXIF DateTime tag (306) with camera make
+        - 'exif_datetime_unknown': EXIF DateTime tag without camera info
+        - 'filesystem': File modification time (fallback)
     """
     try:
         img = Image.open(image_path)
@@ -46,15 +68,20 @@ def extract_exif_date(image_path):
         dt = datetime.fromtimestamp(mtime)
         return (dt, "filesystem")
 
-    except Exception as e:
-        print(f"Error reading {image_path}: {e}")
+    except Exception:
+        # Return None on any error - orchestration handles logging
         return (None, None)
 
 
 def extract_camera_info(image_path):
     """Extract camera make and model.
 
-    Returns dict with 'make' and 'model' keys.
+    Args:
+        image_path: Path to image file (str or Path)
+
+    Returns:
+        dict: {'make': str or None, 'model': str or None}
+              Returns None values on error or if no EXIF data present
     """
     try:
         img = Image.open(image_path)
@@ -68,124 +95,6 @@ def extract_camera_info(image_path):
             "model": exif.get(272),  # Model
         }
 
-    except Exception as e:
-        print(f"Error reading {image_path}: {e}")
+    except Exception:
+        # Return None values on any error - orchestration handles logging
         return {"make": None, "model": None}
-
-
-def generate_organized_path(date, source_type, original_filename):
-    """Generate organized file path: YYYY/YYYY-MM-DD_HHMMSS.ext
-
-    Args:
-        date: datetime object
-        source_type: 'exif_datetime_camera', 'filesystem', etc.
-        original_filename: 'IMG_3630.HEIC'
-
-    Returns: Path object like '2025/2025-06-02_001524.heic'
-    """
-    if date is None:
-        # Fallback: keep original structure for problem files
-        return Path("unsorted") / original_filename
-
-    # Extract extension (convert to lowercase)
-    ext = Path(original_filename).suffix.lower()
-
-    # Generate timestamp filename
-    year = date.strftime("%Y")
-    timestamp = date.strftime("%Y-%m-%d_%H%M%S")
-
-    # Add quality marker for non-camera sources
-    if source_type in ["filesystem", "exif_datetime_unknown"]:
-        filename = f"{timestamp}_{source_type}{ext}"
-    else:
-        filename = f"{timestamp}{ext}"
-
-    return Path(year) / filename
-
-
-def rename_and_organize(source_dir, dest_dir):
-    """Process all images in source_dir, organize into dest_dir.
-
-    Returns: list of tuples (original_path, new_path, metadata)
-    """
-    source = Path(source_dir)
-    dest = Path(dest_dir)
-
-    # Supported formats
-    image_patterns = [
-        "*.heic",
-        "*.HEIC",
-        "*.jpg",
-        "*.JPG",
-        "*.jpeg",
-        "*.JPEG",
-        "*.png",
-        "*.PNG",
-    ]
-
-    # Track ignored files
-    ignored_videos = []
-    ignored_metadata = []
-    ignored_other = []
-
-    # Store results
-    results = []
-
-    # Process all files
-    for file_path in source.iterdir():
-        if not file_path.is_file():
-            continue
-
-        suffix = file_path.suffix.lower()
-
-        # Check if supported image
-        is_image = any(file_path.match(pattern) for pattern in image_patterns)
-
-        if is_image:
-            # Extract metadata
-            date, source_type = extract_exif_date(file_path)
-            camera = extract_camera_info(file_path)
-
-            # Generate organized path
-            rel_path = generate_organized_path(date, source_type, file_path.name)
-            new_path = dest / rel_path
-
-            # Create directory if needed
-            new_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Copy file (don't delete original yet - safety)
-            shutil.copy2(file_path, new_path)
-
-            # Store result
-            results.append(
-                {
-                    "original_path": str(file_path),
-                    "organized_path": str(new_path),
-                    "filename": new_path.name,
-                    "date_taken": date,
-                    "date_source": source_type,
-                    "camera_make": camera["make"],
-                    "camera_model": camera["model"],
-                }
-            )
-
-            # TODO: REMOVE prints from extraction later, just return data --> logging goes in orchestration `process_photos.py` or CLI script later
-            print(f"📸 {file_path.name} → {new_path}")
-
-        # Track ignore files
-        elif suffix in {".mp4", ".mov", ".avi", ".mkv"}:
-            ignored_videos.append(file_path.name)
-        elif suffix in {".csv", ".txt", ".json"}:
-            ignored_metadata.append(file_path.name)
-        else:
-            ignored_other.append(file_path.name)
-
-    # Report ignore (at end, after all processing)
-    if ignored_videos:
-        print(f"\n📹 Skipped {len(ignored_videos)} video files")
-    if ignored_metadata:
-        print(f"📄 Skipped {len(ignored_metadata)} metadata files")
-    if ignored_other:
-        print(f"❓ Skipped {len(ignored_other)} other files")
-
-    return results
