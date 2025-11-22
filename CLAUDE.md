@@ -1,7 +1,7 @@
 # Claude Context: Photo Sovereignty Pipeline
 
-**Version**: v0.1.0  
-**Last Updated**: 2025-11-19  
+**Version**: v0.1.0
+**Last Updated**: 2025-11-23
 **Status**: Foundation complete, Stage 3 (YOLO) next
 
 This document provides architectural context for Claude instances working on this codebase.
