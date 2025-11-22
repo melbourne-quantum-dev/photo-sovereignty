@@ -278,3 +278,124 @@ class TestFileOrganization:
             # At least one year directory should exist
             year_dirs = list(output_dir.glob("[0-9][0-9][0-9][0-9]"))
             assert len(year_dirs) > 0, "At least one year directory should be created"
+
+
+class TestFilenamePreservation:
+    """Test filename preservation strategies."""
+
+    def test_descriptive_name_detection(self):
+        """_is_descriptive_name should identify camera vs descriptive names."""
+        from src.organize import _is_descriptive_name
+
+        # Camera-generated names (should return False)
+        assert not _is_descriptive_name("IMG_1234")
+        assert not _is_descriptive_name("DSC01234")
+        assert not _is_descriptive_name("DSCN5678")
+        assert not _is_descriptive_name("20231215_143022")
+        assert not _is_descriptive_name("2023-12-15_143022")
+        assert not _is_descriptive_name("PXL_20231215_143022")
+        assert not _is_descriptive_name("Screenshot_20231215")
+
+        # iCloud UUID exports (should return False - auto-generated)
+        assert not _is_descriptive_name("0DD028F1-1DCF-48D8-B6D4-D7861D2407F5")
+        assert not _is_descriptive_name("0fe5236c-65a4-4c6d-bf41-b262781290c1")
+        assert not _is_descriptive_name("9a87b2f5-d315-45bd-afa7-d115da25ab2f")
+
+        # Descriptive names (should return True)
+        assert _is_descriptive_name("piazza-dei-signori")
+        assert _is_descriptive_name("wedding-reception")
+        assert _is_descriptive_name("birthday-party-2023")
+        assert _is_descriptive_name("vacation_beach")
+        assert _is_descriptive_name("daisy_cow")
+        assert _is_descriptive_name("dris")
+        assert _is_descriptive_name("england-london-bridge")
+
+    def test_preserve_descriptive_only(self):
+        """Default behavior: preserve descriptive names, strip camera names."""
+        from datetime import datetime
+
+        date = datetime(2023, 6, 15, 14, 30, 22)
+
+        # Camera name should be stripped
+        camera_path = generate_organized_path(
+            date, "exif_original", "IMG_1234.jpg", preserve_filenames="descriptive_only"
+        )
+        assert "IMG_1234" not in str(camera_path)
+        assert "2023-06-15_143022.jpg" in str(camera_path)
+
+        # Descriptive name should be preserved
+        descriptive_path = generate_organized_path(
+            date,
+            "exif_original",
+            "wedding-reception.jpg",
+            preserve_filenames="descriptive_only",
+        )
+        assert "wedding-reception" in str(descriptive_path)
+        assert "2023-06-15_143022_wedding-reception.jpg" in str(descriptive_path)
+
+    def test_preserve_always(self):
+        """preserve_filenames=True should always preserve names."""
+        from datetime import datetime
+
+        date = datetime(2023, 6, 15, 14, 30, 22)
+
+        # Even camera names should be preserved
+        path = generate_organized_path(
+            date, "exif_original", "IMG_1234.jpg", preserve_filenames=True
+        )
+        assert "IMG_1234" in str(path)
+        assert "2023-06-15_143022_IMG_1234.jpg" in str(path)
+
+    def test_preserve_never(self):
+        """preserve_filenames=False should never preserve names."""
+        from datetime import datetime
+
+        date = datetime(2023, 6, 15, 14, 30, 22)
+
+        # Even descriptive names should be stripped
+        path = generate_organized_path(
+            date,
+            "exif_original",
+            "wedding-reception.jpg",
+            preserve_filenames=False,
+        )
+        assert "wedding-reception" not in str(path)
+        assert "2023-06-15_143022.jpg" in str(path)
+
+
+class TestFilesystemDatesDirectory:
+    """Test filesystem_dates directory for unreliable dates."""
+
+    def test_filesystem_date_goes_to_filesystem_dates(self):
+        """Images with filesystem dates should go to filesystem_dates/."""
+        from datetime import datetime
+
+        date = datetime(2025, 11, 23, 9, 58, 2)
+
+        path = generate_organized_path(
+            date, "filesystem", "piazza-dei-signori.jpg", preserve_filenames="descriptive_only"
+        )
+
+        assert "filesystem_dates" in str(path)
+        assert "2025" not in str(path).split("/")[0]  # Should NOT be in year directory
+        assert "piazza-dei-signori" in str(path)
+
+    def test_exif_date_goes_to_year_directory(self):
+        """Images with EXIF dates should go to YYYY/ directory."""
+        from datetime import datetime
+
+        date = datetime(2023, 6, 15, 14, 30, 22)
+
+        path = generate_organized_path(
+            date, "exif_original", "photo.jpg", preserve_filenames="descriptive_only"
+        )
+
+        assert str(path).startswith("2023/")
+        assert "filesystem_dates" not in str(path)
+
+    def test_unsorted_directory_for_no_date(self):
+        """Images with no date should go to unsorted/."""
+        path = generate_organized_path(None, None, "corrupted.jpg")
+
+        assert "unsorted" in str(path)
+        assert "corrupted.jpg" in str(path)
