@@ -53,6 +53,20 @@ processing:
   # Default: 0.5
   confidence_threshold: 0.5
 
+  # Filename preservation strategy when organizing photos
+  # Options:
+  #   'descriptive_only' - Preserve non-camera names (e.g., 'piazza-dei-signori.jpg')
+  #                        but strip camera names (e.g., 'IMG_1234.jpg')
+  #   true               - Always preserve original filename
+  #   false              - Never preserve (timestamp only)
+  # Default: 'descriptive_only'
+  #
+  # Examples:
+  #   Camera photo:      2023/2023-06-15_143022.jpg (camera name stripped)
+  #   Descriptive photo: 2023/2023-06-15_143022_wedding-reception.jpg (preserved)
+  #   Filesystem date:   filesystem_dates/2025-11-23_095802_piazza-dei-signori.jpg
+  preserve_filenames: descriptive_only
+
 models:
   # YOLOv11 model variant (yolo11n, yolo11s, yolo11m, yolo11l, yolo11x)
   # Larger = more accurate but slower. yolo11m recommended.
