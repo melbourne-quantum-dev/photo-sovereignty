@@ -54,11 +54,16 @@ def _is_descriptive_name(stem: str) -> bool:
         r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",  # iCloud UUID exports
     ]
 
-    return not any(re.match(pattern, stem, re.IGNORECASE) for pattern in camera_patterns)
+    return not any(
+        re.match(pattern, stem, re.IGNORECASE) for pattern in camera_patterns
+    )
 
 
 def generate_organized_path(
-    date, source_type, original_filename, preserve_filenames="descriptive_only"
+    date,
+    source_type,
+    original_filename,
+    preserve_filenames: str | bool = "descriptive_only",
 ):
     """Generate organized file path with optional filename preservation.
 

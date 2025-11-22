@@ -390,7 +390,10 @@ class TestFilesystemDatesDirectory:
         date = datetime(2025, 11, 23, 9, 58, 2)
 
         path = generate_organized_path(
-            date, "filesystem", "piazza-dei-signori.jpg", preserve_filenames="descriptive_only"
+            date,
+            "filesystem",
+            "piazza-dei-signori.jpg",
+            preserve_filenames="descriptive_only",
         )
 
         assert "filesystem_dates" in str(path)

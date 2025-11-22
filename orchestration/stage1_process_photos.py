@@ -14,7 +14,6 @@ Usage:
 """
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -25,7 +24,10 @@ app = typer.Typer()
 
 
 def process_photos(
-    source_dir, output_dir, db_path="photo_archive.db", preserve_filenames="descriptive_only"
+    source_dir,
+    output_dir,
+    db_path="photo_archive.db",
+    preserve_filenames="descriptive_only",
 ):
     """Main processing pipeline with duplicate checking.
 
@@ -122,19 +124,19 @@ def main(
         "-c",
         help="Path to configuration file",
     ),
-    source: Optional[str] = typer.Option(
+    source: str | None = typer.Option(
         None,
         "--source",
         "-s",
         help="Source directory with photos (overrides config)",
     ),
-    output: Optional[str] = typer.Option(
+    output: str | None = typer.Option(
         None,
         "--output",
         "-o",
         help="Output directory for organized photos (overrides config)",
     ),
-    db: Optional[str] = typer.Option(
+    db: str | None = typer.Option(
         None,
         "--db",
         "-d",
@@ -165,10 +167,10 @@ def main(
         config_data = load_config(config)
     except FileNotFoundError as e:
         typer.echo(f"❌ {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         typer.echo(f"❌ Error loading config: {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Use CLI args if provided, otherwise use config
     source_dir = source if source else config_data["paths"]["input_directory"]
@@ -186,7 +188,7 @@ def main(
     # Validate source directory exists
     if not source_dir.exists():
         typer.echo(f"❌ Source directory not found: {source_dir}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Extract processing options
     preserve_filenames = config_data["processing"]["preserve_filenames"]

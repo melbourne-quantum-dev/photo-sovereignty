@@ -67,7 +67,6 @@ Stage: Week 2 - GPS Extraction
 """
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -199,7 +198,7 @@ def main(
         "-c",
         help="Path to configuration file",
     ),
-    db: Optional[str] = typer.Option(
+    db: str | None = typer.Option(
         None,
         "--db",
         "-d",
@@ -242,10 +241,10 @@ def main(
         config_data = load_config(config)
     except FileNotFoundError as e:
         typer.echo(f"❌ {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         typer.echo(f"❌ Error loading config: {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Use CLI arg if provided, otherwise use config
     if db:
@@ -257,7 +256,7 @@ def main(
     if not db_path.exists():
         typer.echo(f"❌ Database not found: {db_path}")
         typer.echo("Run stage1_process_photos.py first to create database")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Run extraction pipeline
     extract_gps(db_path)
