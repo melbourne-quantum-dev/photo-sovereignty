@@ -19,41 +19,112 @@ from pathlib import Path
 from src.exif_parser import extract_camera_info, extract_exif_date
 
 
-def generate_organized_path(date, source_type, original_filename):
-    """Generate organized file path: YYYY/YYYY-MM-DD_HHMMSS.ext
+def _is_descriptive_name(stem: str) -> bool:
+    """Check if filename is descriptive vs camera-generated.
+
+    Camera-generated patterns include:
+    - IMG_1234, DSC01234, DSCN1234
+    - 20231215_143022 (date-based)
+    - Screenshot patterns
 
     Args:
-        date: datetime object
-        source_type: 'exif_datetime_camera', 'filesystem', etc.
-        original_filename: 'IMG_3630.HEIC'
+        stem: Filename without extension
 
-    Returns: Path object like '2025/2025-06-02_001524.heic'
+    Returns:
+        True if filename appears descriptive/meaningful
     """
+    import re
+
+    # Camera and auto-generated patterns
+    camera_patterns = [
+        r"^IMG_\d+$",  # IMG_1234
+        r"^DSC[N]?\d+$",  # DSC01234, DSCN1234
+        r"^\d{8}_\d{6}$",  # 20231215_143022
+        r"^\d{4}-\d{2}-\d{2}_\d{6}$",  # 2023-12-15_143022 (already organized)
+        r"^IMG-\d+",  # IMG-20231215-WA0001
+        r"^PXL_",  # Pixel phone format (PXL_20231215_143022)
+        r"^Screenshot",  # Screenshot_...
+        r"^\d{4}-\d{2}-\d{2}",  # Starts with date
+        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",  # iCloud UUID exports
+    ]
+
+    return not any(re.match(pattern, stem, re.IGNORECASE) for pattern in camera_patterns)
+
+
+def generate_organized_path(
+    date, source_type, original_filename, preserve_filenames="descriptive_only"
+):
+    """Generate organized file path with optional filename preservation.
+
+    Organization strategy:
+    - Reliable EXIF dates → YYYY/ directory
+    - Filesystem dates → filesystem_dates/ (needs review)
+    - No date → unsorted/
+
+    Args:
+        date: datetime object or None
+        source_type: 'exif_original', 'exif_datetime_camera', 'filesystem', etc.
+        original_filename: 'IMG_3630.HEIC' or 'piazza-dei-signori.jpg'
+        preserve_filenames: Filename preservation strategy:
+            - 'descriptive_only': Preserve only non-camera names (default)
+            - True: Always preserve original name
+            - False: Never preserve (timestamp only)
+
+    Returns:
+        Path object like:
+        - '2025/2025-06-02_001524.heic' (EXIF, camera name)
+        - '2023/2023-06-15_143022_wedding-reception.jpg' (EXIF, descriptive)
+        - 'filesystem_dates/2025-11-23_095802_piazza-dei-signori.jpg'
+        - 'unsorted/corrupted-file.jpg'
+    """
+    # Extract original stem (without extension) and extension
+    original_path = Path(original_filename)
+    ext = original_path.suffix.lower()
+    original_stem = original_path.stem
+
+    # Case 1: No date at all (corrupted/unreadable)
     if date is None:
-        # Fallback: keep original structure for problem files
         return Path("unsorted") / original_filename
 
-    # Extract extension (convert to lowercase)
-    ext = Path(original_filename).suffix.lower()
-
-    # Generate timestamp filename
-    year = date.strftime("%Y")
+    # Generate timestamp
     timestamp = date.strftime("%Y-%m-%d_%H%M%S")
 
-    # Add quality marker for non-camera sources
-    if source_type in ["filesystem", "exif_datetime_unknown"]:
-        filename = f"{timestamp}_{source_type}{ext}"
+    # Determine if we should preserve the original filename
+    should_preserve = False
+    if preserve_filenames is True:
+        should_preserve = True
+    elif preserve_filenames == "descriptive_only":
+        should_preserve = _is_descriptive_name(original_stem)
+    # else preserve_filenames is False, should_preserve stays False
+
+    # Build filename
+    if should_preserve:
+        filename = f"{timestamp}_{original_stem}{ext}"
     else:
         filename = f"{timestamp}{ext}"
 
+    # Case 2: Filesystem date (unreliable - needs manual review)
+    if source_type in ["filesystem", "exif_datetime_unknown"]:
+        return Path("filesystem_dates") / filename
+
+    # Case 3: Reliable EXIF date
+    year = date.strftime("%Y")
     return Path(year) / filename
 
 
-def rename_and_organize(source_dir, dest_dir):
+def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_only"):
     """Process all images in source_dir, organize into dest_dir.
 
     This is a pure data processing function - no user output.
     Orchestration layer handles progress reporting.
+
+    Args:
+        source_dir: Source directory with photos
+        dest_dir: Destination directory for organized photos
+        preserve_filenames: Filename preservation strategy:
+            - 'descriptive_only': Preserve only non-camera names (default)
+            - True: Always preserve original name
+            - False: Never preserve (timestamp only)
 
     Returns:
         list of dicts: Each dict contains:
@@ -108,7 +179,9 @@ def rename_and_organize(source_dir, dest_dir):
             camera = extract_camera_info(file_path)
 
             # Generate organized path
-            rel_path = generate_organized_path(date, source_type, file_path.name)
+            rel_path = generate_organized_path(
+                date, source_type, file_path.name, preserve_filenames
+            )
             new_path = dest / rel_path
 
             # Create directory if needed

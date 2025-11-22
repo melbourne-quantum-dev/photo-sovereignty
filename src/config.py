@@ -194,6 +194,7 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
 
     config["processing"].setdefault("batch_size", 32)
     config["processing"].setdefault("confidence_threshold", 0.5)
+    config["processing"].setdefault("preserve_filenames", "descriptive_only")
 
     # Provide model defaults if not specified
     if "models" not in config:
