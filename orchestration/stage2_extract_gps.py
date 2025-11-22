@@ -66,12 +66,16 @@ Date: 2025-10-27 (Session 3-4)
 Stage: Week 2 - GPS Extraction
 """
 
-import argparse
 from pathlib import Path
+from typing import Optional
+
+import typer
 
 from src.config import load_config
 from src.database import create_database, insert_location, query_images_without_gps
 from src.gps_extractor import extract_gps_coords
+
+app = typer.Typer()
 
 
 def extract_gps(db_path):
@@ -187,8 +191,22 @@ def extract_gps(db_path):
     return success_count
 
 
-if __name__ == "__main__":
-    """CLI entry point for GPS extraction.
+@app.command()
+def main(
+    config: str = typer.Option(
+        "config.yaml",
+        "--config",
+        "-c",
+        help="Path to configuration file",
+    ),
+    db: Optional[str] = typer.Option(
+        None,
+        "--db",
+        "-d",
+        help="Path to photo archive database (overrides config)",
+    ),
+):
+    """Extract GPS coordinates from photos and store in database.
 
     Configuration Loading:
         Loads database path from config.yaml by default. CLI --db argument
@@ -206,62 +224,44 @@ if __name__ == "__main__":
 
     Examples:
         # Use config.yaml database path (recommended)
-        python extract_gps.py
+        python stage2_extract_gps.py
 
         # Override database path
-        python extract_gps.py --db ~/test/photo_archive.db
+        python stage2_extract_gps.py --db ~/test/photo_archive.db
 
         # Use custom config file
-        python extract_gps.py --config production.yaml
-    """
+        python stage2_extract_gps.py --config production.yaml
 
-    parser = argparse.ArgumentParser(
-        description="Extract GPS coordinates from photos and store in database",
-        epilog="""
-        Foundation Note: This script processes only images without existing GPS data.
+    Foundation Note:
+        This script processes only images without existing GPS data.
         Safe to run multiple times - enables incremental processing and error recovery.
-
-        Privacy Note: Database path loaded from config.yaml (gitignored).
-        CLI --db argument overrides config when provided.
-        """,
-    )
-
-    # Config file selection
-    parser.add_argument(
-        "--config",
-        default="config.yaml",
-        help="Path to configuration file (default: config.yaml)",
-    )
-
-    # Database path override (optional - use config if not provided)
-    parser.add_argument(
-        "--db",
-        help="Path to photo archive database (overrides config, supports ~ expansion)",
-    )
-
-    args = parser.parse_args()
+    """
 
     # Load configuration
     try:
-        config = load_config(args.config)
+        config_data = load_config(config)
     except FileNotFoundError as e:
-        print(f"❌ {e}")
-        exit(1)
+        typer.echo(f"❌ {e}")
+        raise typer.Exit(1)
     except Exception as e:
-        print(f"❌ Error loading config: {e}")
-        exit(1)
+        typer.echo(f"❌ Error loading config: {e}")
+        raise typer.Exit(1)
 
     # Use CLI arg if provided, otherwise use config
-    if args.db:
-        db_path = Path(args.db).expanduser()
+    if db:
+        db_path = Path(db).expanduser()
     else:
-        db_path = config["paths"]["database"]
+        db_path = config_data["paths"]["database"]
 
     # Validate database exists
     if not db_path.exists():
-        print(f"❌ Database not found: {db_path}")
-        print("Run process_photos.py first to create database")
-        exit(1)
+        typer.echo(f"❌ Database not found: {db_path}")
+        typer.echo("Run stage1_process_photos.py first to create database")
+        raise typer.Exit(1)
 
     # Run extraction pipeline
     extract_gps(db_path)
+
+
+if __name__ == "__main__":
+    app()

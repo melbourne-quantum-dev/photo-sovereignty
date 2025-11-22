@@ -1,6 +1,6 @@
-# Examples: Modular Processing Scripts
+# Orchestration: Modular Processing Scripts
 
-This directory contains standalone scripts demonstrating each stage of the photo sovereignty pipeline. These scripts were used during incremental development (Weeks 1-2) and serve as:
+This directory contains standalone typer-based CLI scripts demonstrating each stage of the photo sovereignty pipeline. These scripts were used during incremental development (Weeks 1-2) and serve as:
 
 1. **Working examples** of how each pipeline component operates independently
 2. **Testing utilities** for validating individual stages during development
@@ -19,13 +19,13 @@ Demonstrates Stage 1 of the pipeline:
 **Usage:**
 ```bash
 # Use config.yaml paths (recommended)
-python examples/stage1_process_photos.py
+python orchestration/stage1_process_photos.py
 
 # Override specific paths
-python examples/stage1_process_photos.py --source ~/Downloads/photos --db test.db
+python orchestration/stage1_process_photos.py --source ~/Downloads/photos --db test.db
 
 # Use custom config file
-python examples/stage1_process_photos.py --config production.yaml
+python orchestration/stage1_process_photos.py --config production.yaml
 ```
 
 **Key Features:**
@@ -47,13 +47,13 @@ Demonstrates Stage 2 of the pipeline:
 **Usage:**
 ```bash
 # Use config.yaml database path (recommended)
-python examples/stage2_extract_gps.py
+python orchestration/stage2_extract_gps.py
 
 # Override database path
-python examples/stage2_extract_gps.py --db ~/test/photo_archive.db
+python orchestration/stage2_extract_gps.py --db ~/test/photo_archive.db
 
 # Use custom config file
-python examples/stage2_extract_gps.py --config production.yaml
+python orchestration/stage2_extract_gps.py --config production.yaml
 ```
 
 **Key Features:**
@@ -71,8 +71,9 @@ python examples/stage2_extract_gps.py --config production.yaml
 These scripts demonstrate **separation of concerns**:
 
 - **Extraction logic** (`src/exif_parser.py`, `src/gps_extractor.py`): Pure functions, no side effects
+- **Organization logic** (`src/organize.py`): File operations, path generation, archive extraction
 - **Persistence logic** (`src/database.py`): Database operations isolated
-- **Orchestration** (these scripts): CLI interface + pipeline coordination
+- **Orchestration** (these scripts): Typer CLI interface + pipeline coordination + user output
 
 This architecture enables:
 - Independent unit testing of each component

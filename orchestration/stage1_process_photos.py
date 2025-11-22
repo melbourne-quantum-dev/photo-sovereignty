@@ -4,20 +4,24 @@ Process photos: Extract EXIF, organize files, store in database.
 
 Usage:
     # Use config.yaml paths (recommended)
-    python process_photos.py
+    python stage1_process_photos.py
 
     # Override specific paths
-    python process_photos.py --source ~/Downloads/photos --db test.db
+    python stage1_process_photos.py --source ~/Downloads/photos --db test.db
 
     # Use custom config file
-    python process_photos.py --config production.yaml
+    python stage1_process_photos.py --config production.yaml
 """
 
-import argparse
 from pathlib import Path
+from typing import Optional
+
+import typer
 
 from src.database import create_database, insert_image
-from src.exif_parser import rename_and_organize
+from src.organize import rename_and_organize
+
+app = typer.Typer()
 
 
 def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
@@ -46,24 +50,32 @@ def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
     print(f"📊 Database contains {len(already_processed)} processed images\n")
 
     # Process and organize files
-    # Note: Printing currently in exif_parser.py (layer separation fix deferred to Week 6)
     results = rename_and_organize(source_dir, output_dir)
 
-    # Insert only new images
+    # Separate results by file type
+    images = [r for r in results if r["file_type"] == "image"]
+    videos = [r for r in results if r["file_type"] == "video"]
+    metadata_files = [r for r in results if r["file_type"] == "metadata"]
+    other_files = [r for r in results if r["file_type"] == "other"]
+
+    # Insert images and track progress
     new_count = 0
     skip_count = 0
     MAX_SKIP_DISPLAY = 5  # Show first 5 skips, then summarize
 
-    for image_data in results:
+    for image_data in images:
+        # Show processing progress
+        print(f"📸 {Path(image_data['original_path']).name} → {image_data['filename']}")
+
         # Check if already in database
         if image_data["original_path"] in already_processed:
             skip_count += 1
 
             # Show first few skips, then summarize rest
             if skip_count <= MAX_SKIP_DISPLAY:
-                print(f"  ⏭️  Skip: {image_data['filename']}")
+                print(f"  ⏭️  Skip: {image_data['filename']} (already in database)")
             elif skip_count == MAX_SKIP_DISPLAY + 1:
-                remaining = len(results) - new_count - MAX_SKIP_DISPLAY
+                remaining = len(images) - new_count - MAX_SKIP_DISPLAY
                 print(f"  ⏭️  ... and {remaining} more skipped")
 
             continue
@@ -74,6 +86,14 @@ def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
         print(f"  ✅ DB ID {image_id}: {image_data['filename']}")
 
     conn.close()
+
+    # Report skipped files
+    if videos:
+        print(f"\n📹 Skipped {len(videos)} video files")
+    if metadata_files:
+        print(f"📄 Skipped {len(metadata_files)} metadata files")
+    if other_files:
+        print(f"❓ Skipped {len(other_files)} other files")
 
     # Summary
     print(f"\n{'=' * 60}")
@@ -92,8 +112,34 @@ def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
     print(f"{'=' * 60}")
 
 
-if __name__ == "__main__":
-    """CLI entry point for photo processing.
+@app.command()
+def main(
+    config: str = typer.Option(
+        "config.yaml",
+        "--config",
+        "-c",
+        help="Path to configuration file",
+    ),
+    source: Optional[str] = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Source directory with photos (overrides config)",
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output directory for organized photos (overrides config)",
+    ),
+    db: Optional[str] = typer.Option(
+        None,
+        "--db",
+        "-d",
+        help="Database file path (overrides config)",
+    ),
+):
+    """Process photos: Extract EXIF, organize files, store in database.
 
     Configuration Loading:
         Loads paths from config.yaml by default. CLI arguments override config values.
@@ -102,69 +148,47 @@ if __name__ == "__main__":
 
     Examples:
         # Use config.yaml paths (recommended)
-        python process_photos.py
+        python stage1_process_photos.py
 
         # Override specific paths
-        python process_photos.py --source ~/Downloads/photos --db test.db
+        python stage1_process_photos.py --source ~/Downloads/photos --db test.db
 
         # Use custom config file
-        python process_photos.py --config production.yaml
+        python stage1_process_photos.py --config production.yaml
     """
     from src.config import load_config
 
-    parser = argparse.ArgumentParser(
-        description="Process photo archive: Extract EXIF, organize files, store metadata",
-        epilog="""
-        Privacy Note: Paths loaded from config.yaml (gitignored).
-        CLI arguments override config values when provided.
-        """,
-    )
-
-    # Config file selection
-    parser.add_argument(
-        "--config",
-        default="config.yaml",
-        help="Path to configuration file (default: config.yaml)",
-    )
-
-    # Path overrides (optional - use config if not provided)
-    parser.add_argument(
-        "--source", help="Source directory with photos (overrides config)"
-    )
-    parser.add_argument(
-        "--output", help="Output directory for organized photos (overrides config)"
-    )
-    parser.add_argument("--db", help="Database file path (overrides config)")
-
-    args = parser.parse_args()
-
     # Load configuration
     try:
-        config = load_config(args.config)
+        config_data = load_config(config)
     except FileNotFoundError as e:
-        print(f"❌ {e}")
-        exit(1)
+        typer.echo(f"❌ {e}")
+        raise typer.Exit(1)
     except Exception as e:
-        print(f"❌ Error loading config: {e}")
-        exit(1)
+        typer.echo(f"❌ Error loading config: {e}")
+        raise typer.Exit(1)
 
     # Use CLI args if provided, otherwise use config
-    source_dir = args.source if args.source else config["paths"]["input_directory"]
-    output_dir = args.output if args.output else config["paths"]["output_directory"]
-    db_path = args.db if args.db else config["paths"]["database"]
+    source_dir = source if source else config_data["paths"]["input_directory"]
+    output_dir = output if output else config_data["paths"]["output_directory"]
+    db_path = db if db else config_data["paths"]["database"]
 
     # Expand paths if provided via CLI
-    if args.source:
+    if source:
         source_dir = Path(source_dir).expanduser()
-    if args.output:
+    if output:
         output_dir = Path(output_dir).expanduser()
-    if args.db:
+    if db:
         db_path = Path(db_path).expanduser()
 
     # Validate source directory exists
     if not source_dir.exists():
-        print(f"❌ Source directory not found: {source_dir}")
-        exit(1)
+        typer.echo(f"❌ Source directory not found: {source_dir}")
+        raise typer.Exit(1)
 
     # Run processing
     process_photos(str(source_dir), str(output_dir), str(db_path))
+
+
+if __name__ == "__main__":
+    app()
