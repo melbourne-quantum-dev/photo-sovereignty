@@ -9,8 +9,13 @@ capabilities (iCloud, Google Photos) while maintaining complete data sovereignty
 ## Features
 
 ### v0.1.0 - Foundation Complete ✅
-- EXIF metadata extraction with fallback hierarchy (EXIF → filesystem → filename)
+- EXIF metadata extraction with fallback hierarchy (EXIF → filesystem)
 - GPS coordinate extraction and DMS→decimal conversion
+- **Semantic file organization**:
+  - Year directories (`2023/`) for reliable EXIF dates
+  - `filesystem_dates/` for photos needing manual review
+  - `unsorted/` for corrupted/unreadable files
+- **Smart filename preservation**: Strips camera-generated names (IMG_*, UUIDs), preserves descriptive names
 - Cross-platform configuration system (platformdirs)
 - Idempotent database operations (safe re-runs, duplicate detection)
 - Incremental processing (LEFT JOIN pattern for unprocessed images)

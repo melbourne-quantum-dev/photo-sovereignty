@@ -79,8 +79,16 @@ Local-first ML-powered photo organization that replicates cloud service search c
 - Handles HEIC via pillow-heif
 
 **`src/organize.py`**
-- File organization and path generation
-- Generates organized paths: `YYYY/YYYY-MM-DD_HHMMSS.ext`
+- File organization with semantic directory structure
+- Three-tier organization strategy:
+  - `YYYY/` - Reliable EXIF dates (trusted photo dates)
+  - `filesystem_dates/` - Unreliable dates needing review
+  - `unsorted/` - Corrupted/no date found
+- Smart filename preservation (config: `preserve_filenames`)
+  - `'descriptive_only'` (default): Strips camera names (IMG_1234, UUIDs), preserves descriptive names
+  - `true`: Always preserves original filenames
+  - `false`: Never preserves (timestamp only)
+- Recognizes camera patterns: IMG_*, DSC*, PXL_*, iCloud UUIDs, Screenshots
 - Archive extraction (unzip iCloud exports, photo backups)
 - File type classification (images, videos, metadata, other)
 - Returns structured data dicts with file_type and processed fields
@@ -105,6 +113,36 @@ Local-first ML-powered photo organization that replicates cloud service search c
 - Unified database inspection utility
 - Query options: schema, all_images, gps_coverage, date_sources, cameras, etc.
 - Replaces legacy query scripts
+
+---
+
+## Organized Directory Structure
+
+Photos are organized into a **semantic three-tier structure** based on date reliability:
+
+```
+organized/
+├── 2018/                          # Reliable EXIF dates
+│   └── 2018-08-22_131341_england-london-bridge.jpg
+├── 2020/
+│   └── 2020-01-01_132555.jpg     # UUID stripped
+├── 2023/
+│   └── 2023-01-22_121254_dris.jpeg
+├── 2025/
+│   └── 2025-05-29_165824.heic     # Camera name (IMG_3382) stripped
+├── filesystem_dates/              # Needs manual review/re-dating
+│   ├── 2025-11-23_095802_piazza-dei-signori.jpg  # Descriptive name preserved
+│   └── 2025-11-23_090750.jpg      # UUID stripped
+└── unsorted/                       # Corrupted files/no date
+    └── corrupted-file.jpg
+```
+
+**Rationale**:
+- **Year directories**: Photos with reliable EXIF dates → searchable by actual capture date
+- **filesystem_dates/**: Photos using file modification time → needs review (screenshots, downloads, edited photos)
+- **unsorted/**: Corrupted or completely unreadable files → manual intervention required
+
+This structure makes it immediately clear which photos have trustworthy dates vs. which need manual attention.
 
 ---
 
