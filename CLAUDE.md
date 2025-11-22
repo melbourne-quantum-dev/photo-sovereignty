@@ -25,10 +25,10 @@ Local-first ML-powered photo organization that replicates cloud service search c
 ```
 ┌─────────────────────────────────────────┐
 │  Layer 3: Orchestration                 │
-│  (examples/*.py, dev_tools/*.py)        │
-│  - CLI interfaces                       │
+│  (orchestration/*.py, dev_tools/*.py)   │
+│  - CLI interfaces (typer)               │
 │  - Combines extraction + persistence    │
-│  - Progress reporting                   │
+│  - Progress reporting & user output     │
 └─────────────────────────────────────────┘
               ▼
 ┌─────────────────────────────────────────┐
@@ -40,10 +40,12 @@ Local-first ML-powered photo organization that replicates cloud service search c
 └─────────────────────────────────────────┘
               ▼
 ┌─────────────────────────────────────────┐
-│  Layer 1: Extraction                    │
-│  (src/exif_parser.py, gps_extractor.py) │
+│  Layer 1: Extraction & Organization     │
+│  (src/exif_parser.py, gps_extractor.py, │
+│   organize.py)                          │
 │  - Pure functions (data in → data out)  │
 │  - No database operations               │
+│  - No user-facing output                │
 │  - Returns Python native types          │
 └─────────────────────────────────────────┘
 ```
@@ -68,11 +70,21 @@ Local-first ML-powered photo organization that replicates cloud service search c
 - Idempotent operations (safe to re-run)
 - LEFT JOIN pattern for finding unprocessed items
 
-**`src/exif_parser.py`** (79.52% coverage)
-- Date extraction hierarchy: EXIF DateTimeOriginal > DateTimeDigitized > DateTime > filesystem
+**`src/exif_parser.py`**
+- EXIF metadata extraction only (separation from organization logic)
+- Date extraction hierarchy: EXIF DateTimeOriginal > DateTime > filesystem
+- Camera information extraction (make, model)
 - Returns `(datetime, source_string)` tuple
-- Generates organized paths: `YYYY/YYYY-MM-DD_HHMMSS.ext`
+- No user-facing output (returns None on errors)
 - Handles HEIC via pillow-heif
+
+**`src/organize.py`**
+- File organization and path generation
+- Generates organized paths: `YYYY/YYYY-MM-DD_HHMMSS.ext`
+- Archive extraction (unzip iCloud exports, photo backups)
+- File type classification (images, videos, metadata, other)
+- Returns structured data dicts with file_type and processed fields
+- No user-facing output (orchestration handles logging)
 
 **`src/gps_extractor.py`** (91.43% coverage)
 - Extracts GPS from EXIF IFD tag 34853
@@ -80,11 +92,14 @@ Local-first ML-powered photo organization that replicates cloud service search c
 - Returns `(lat, lon, alt)` tuple or None
 - Converts PIL IFDRational to Python float internally
 
-**`examples/stage{N}_*.py`**
+**`orchestration/stage{N}_*.py`**
 - Modular processing scripts (one per stage)
+- Typer-based CLI interfaces (replaces argparse)
 - Show component usage independently
 - Will be unified into `main.py` in Week 6-7
 - Each follows same pattern: query → extract → persist → report
+- All user-facing output (print statements) lives here
+- Orchestration layer: combines src/* modules with progress reporting
 
 **`dev_tools/inspect_db.py`**
 - Unified database inspection utility
@@ -192,7 +207,7 @@ def test_convert_dms_with_synthetic_data():
 1. Tests what users actually call (public API)
 2. Tests with real data (actual EXIF/GPS from images)
 3. Resilient to internal refactoring
-4. Matches `examples/stage2_extract_gps.py` workflow
+4. Matches `orchestration/stage2_extract_gps.py` workflow
 
 ### Running Tests
 
@@ -416,10 +431,11 @@ Follow the established pattern:
        # LEFT JOIN to find unprocessed
    ```
 
-3. **Create orchestration script**: `examples/stage{N}_{stage}.py`
+3. **Create orchestration script**: `orchestration/stage{N}_{stage}.py`
    - Import from src/
    - Query → Extract → Persist → Report
-   - CLI with argparse
+   - CLI with typer
+   - All user-facing output (print statements) here
 
 4. **Write tests**: `tests/test_{stage}.py`
    - Use high-level API with real sample data
@@ -451,14 +467,14 @@ lon = gps_ifd.get(4)  # Longitude
 print(f"Lat: {lat}, Lon: {lon}")
 ```
 
-### Running Individual Example Scripts
+### Running Individual Orchestration Scripts
 
 ```bash
-# Stage 1: EXIF extraction
-python examples/stage1_process_photos.py --source ~/Pictures --output ~/organized
+# Stage 1: EXIF extraction and organization
+python orchestration/stage1_process_photos.py --source ~/Pictures --output ~/organized
 
-# Stage 2: GPS extraction  
-python examples/stage2_extract_gps.py --db ~/organized/photo_archive.db
+# Stage 2: GPS extraction
+python orchestration/stage2_extract_gps.py --db ~/organized/photo_archive.db
 
 # Database inspection
 python dev_tools/inspect_db.py --query gps_coverage
@@ -526,10 +542,10 @@ db_path = Path.home() / "data" / "photo_archive.db"
 
 ### Unified CLI Plan
 
-**Current** (modular scripts):
+**Current** (modular scripts with typer):
 ```bash
-python examples/stage1_process_photos.py --source ~/photos
-python examples/stage2_extract_gps.py --db photo_archive.db
+python orchestration/stage1_process_photos.py --source ~/photos
+python orchestration/stage2_extract_gps.py --db photo_archive.db
 ```
 
 **Future** (unified interface):
@@ -540,11 +556,11 @@ python main.py process --stage yolo --device cuda
 python main.py search --object dog
 ```
 
-**Implementation**: 
+**Implementation**:
 - Keep `src/` modules unchanged
-- Create `main.py` with argparse subparsers
-- Import and call existing functions
-- Optional: Add Questionary TUI
+- Create `main.py` with typer (already using typer in orchestration scripts)
+- Import and call existing functions from orchestration scripts
+- Optional: Add rich/questionary for enhanced TUI
 
 ---
 
@@ -554,7 +570,7 @@ python main.py search --object dog
 
 - `docs/public/blueprint.md`: Original project plan and technical specs
 - `ARCHITECTURE.md`: High-level architecture overview
-- `examples/README.md`: Modular script documentation
+- `orchestration/README.md`: Modular script documentation
 - `tests/archive/README.md`: Why legacy scripts were archived
 
 ### Session Summaries

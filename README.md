@@ -32,10 +32,10 @@ uv pip install -e ".[dev]"
 pip install -e ".[dev]"
 
 # Process photos (uses platformdirs defaults or config.yaml)
-python examples/stage1_process_photos.py --source ~/Pictures --output ~/organized
+python orchestration/stage1_process_photos.py --source ~/Pictures --output ~/organized
 
 # Extract GPS coordinates
-python examples/stage2_extract_gps.py
+python orchestration/stage2_extract_gps.py
 
 # Inspect database
 python dev_tools/inspect_db.py --query gps_coverage
@@ -48,9 +48,10 @@ photo-sovereignty/
 ├── src/                    # Core library modules
 │   ├── config.py          # Cross-platform configuration
 │   ├── database.py        # SQLite operations
-│   ├── exif_parser.py     # EXIF extraction & organization
+│   ├── exif_parser.py     # EXIF metadata extraction
+│   ├── organize.py        # File organization & archive handling
 │   └── gps_extractor.py   # GPS coordinate extraction
-├── examples/              # Modular stage demonstrations
+├── orchestration/         # Modular stage scripts (typer CLIs)
 │   ├── stage1_process_photos.py
 │   └── stage2_extract_gps.py
 ├── tests/                 # Pytest suite
@@ -82,9 +83,9 @@ cp config.example.yaml config.yaml
 ## Architecture
 
 **Three-layer design:**
-- **Extraction**: Pure functions (src/exif_parser.py, src/gps_extractor.py)
+- **Extraction & Organization**: Pure functions (src/exif_parser.py, src/organize.py, src/gps_extractor.py)
 - **Persistence**: Database operations (src/database.py)
-- **Orchestration**: CLI interfaces (examples/, dev_tools/)
+- **Orchestration**: Typer CLI interfaces (orchestration/, dev_tools/)
 
 **Key principles:**
 - Idempotent processing (safe to re-run)
@@ -112,10 +113,11 @@ ruff check src/ tests/
 
 ## Tech Stack
 
-- **Python 3.10+**: Modern type hints, pattern matching
+- **Python 3.11+**: Modern type hints, pattern matching
 - **SQLite**: Local-first persistence
 - **Pillow + pillow-heif**: Image processing (HEIC support)
 - **platformdirs**: Cross-platform paths (XDG standards)
+- **typer**: Modern CLI framework with type hints
 - **pytest**: Testing framework
 - **uv**: Fast Python package manager
 
