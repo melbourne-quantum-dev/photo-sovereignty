@@ -27,12 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from src.exif_parser import (
-    extract_camera_info,
-    extract_exif_date,
-    generate_organized_path,
-    rename_and_organize,
-)
+from src.exif_parser import extract_camera_info, extract_exif_date
+from src.organize import generate_organized_path, rename_and_organize
 
 
 class TestExifDateExtraction:
@@ -247,14 +243,18 @@ class TestFileOrganization:
         # Each result should have required keys
         for result in results:
             assert "original_path" in result
-            assert "organized_path" in result
+            assert "organized_path" in result or not result["processed"]
             assert "filename" in result
-            assert "date_taken" in result
-            assert "date_source" in result
-            assert "camera_make" in result
-            assert "camera_model" in result
+            assert "date_taken" in result or not result["processed"]
+            assert "date_source" in result or not result["processed"]
+            assert "camera_make" in result or not result["processed"]
+            assert "camera_model" in result or not result["processed"]
+            assert "file_type" in result
+            assert "processed" in result
 
-            print(f"  ✅ {result['filename']}")
+            # Only print processed images
+            if result["processed"]:
+                print(f"  ✅ {result['filename']}")
 
     @pytest.mark.integration
     def test_organized_files_exist(self, sample_photos_dir, temp_dir):
@@ -262,10 +262,11 @@ class TestFileOrganization:
         output_dir = temp_dir / "organized"
         results = rename_and_organize(str(sample_photos_dir), str(output_dir))
 
-        # Check that organized files exist
+        # Check that organized files exist (only for processed images)
         for result in results:
-            organized_file = Path(output_dir) / result["organized_path"]
-            assert organized_file.exists(), f"File should exist: {organized_file}"
+            if result["processed"] and result["file_type"] == "image":
+                organized_file = Path(result["organized_path"])
+                assert organized_file.exists(), f"File should exist: {organized_file}"
 
     @pytest.mark.integration
     def test_year_directories_created(self, sample_photos_dir, temp_dir):
