@@ -24,7 +24,9 @@ from src.organize import rename_and_organize
 app = typer.Typer()
 
 
-def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
+def process_photos(
+    source_dir, output_dir, db_path="photo_archive.db", preserve_filenames="descriptive_only"
+):
     """Main processing pipeline with duplicate checking.
 
     Foundation note: Idempotent processing enables:
@@ -50,7 +52,7 @@ def process_photos(source_dir, output_dir, db_path="photo_archive.db"):
     print(f"📊 Database contains {len(already_processed)} processed images\n")
 
     # Process and organize files
-    results = rename_and_organize(source_dir, output_dir)
+    results = rename_and_organize(source_dir, output_dir, preserve_filenames)
 
     # Separate results by file type
     images = [r for r in results if r["file_type"] == "image"]
@@ -186,8 +188,11 @@ def main(
         typer.echo(f"❌ Source directory not found: {source_dir}")
         raise typer.Exit(1)
 
+    # Extract processing options
+    preserve_filenames = config_data["processing"]["preserve_filenames"]
+
     # Run processing
-    process_photos(str(source_dir), str(output_dir), str(db_path))
+    process_photos(str(source_dir), str(output_dir), str(db_path), preserve_filenames)
 
 
 if __name__ == "__main__":
