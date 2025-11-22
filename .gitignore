@@ -25,14 +25,14 @@ htmlcov/s
 # Data directory - privacy-first approach
 # All contents gitignored except directory structure
 data/sample_photos/*
-data/organized_test/*
+data/organized_sample_photos/*
 data/*.db
 data/*.db-journal
 data/*.sqlite3
 
 # Preserve directory structure only
 !data/sample_photos/.gitkeep
-!data/organized_test/.gitkeep
+!data/organized_sample_photos/.gitkeep
 
 # Downloaded models (Week 3-4)
 models/
