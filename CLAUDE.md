@@ -1,8 +1,8 @@
 # Claude Context: Photo Sovereignty Pipeline
 
-**Version**: v0.1.0
-**Last Updated**: 2025-11-23
-**Status**: Foundation complete, Stage 3 (YOLO) next
+**Version**: v0.1.1-dev
+**Last Updated**: 2025-11-25
+**Status**: Foundation complete with video support, ready for 176GB test, Stage 3 (YOLO) next
 
 This document provides architectural context for Claude instances working on this codebase.
 
@@ -118,31 +118,47 @@ Local-first ML-powered photo organization that replicates cloud service search c
 
 ## Organized Directory Structure
 
-Photos are organized into a **semantic three-tier structure** based on date reliability:
+Photos and videos are organized into a **media-split semantic structure** based on type and date reliability:
 
 ```
 organized/
-├── 2018/                          # Reliable EXIF dates
-│   └── 2018-08-22_131341_england-london-bridge.jpg
-├── 2020/
-│   └── 2020-01-01_132555.jpg     # UUID stripped
-├── 2023/
-│   └── 2023-01-22_121254_dris.jpeg
-├── 2025/
-│   └── 2025-05-29_165824.heic     # Camera name (IMG_3382) stripped
-├── filesystem_dates/              # Needs manual review/re-dating
-│   ├── 2025-11-23_095802_piazza-dei-signori.jpg  # Descriptive name preserved
-│   └── 2025-11-23_090750.jpg      # UUID stripped
-└── unsorted/                       # Corrupted files/no date
-    └── corrupted-file.jpg
+├── photos/                        # Photo media
+│   ├── 2018/                      # Reliable EXIF dates
+│   │   └── 2018-08-22_131341_england-london-bridge.jpg
+│   ├── 2020/
+│   │   └── 2020-01-01_132555.jpg  # UUID stripped
+│   ├── 2023/
+│   │   └── 2023-01-22_121254_dris.jpeg
+│   ├── 2025/
+│   │   └── 2025-05-29_165824.heic  # Camera name (IMG_3382) stripped
+│   ├── filesystem_dates/          # Needs manual review/re-dating
+│   │   ├── 2025-11-23_095802_piazza-dei-signori.jpg  # Descriptive name preserved
+│   │   └── 2025-11-23_090750_holy grasp of undying zed.png  # Double timestamp fixed
+│   └── unsorted/                  # Corrupted files/no date
+│       └── corrupted-file.jpg
+└── videos/                        # Video media
+    ├── 2020/
+    │   └── 2020-03-15_143530.mov
+    ├── 2025/
+    │   └── 2025-07-01_051300.mp4
+    ├── filesystem_dates/
+    │   └── 2025-11-23_120000_screen-recording.mp4
+    └── unsorted/
+        └── corrupted-video.mov
 ```
 
 **Rationale**:
-- **Year directories**: Photos with reliable EXIF dates → searchable by actual capture date
-- **filesystem_dates/**: Photos using file modification time → needs review (screenshots, downloads, edited photos)
+- **Media split**: Photos and videos in separate top-level directories for easier ML processing (YOLO on photos, future video transcription)
+- **Year directories**: Media with reliable EXIF dates → searchable by actual capture date
+- **filesystem_dates/**: Media using file modification time → needs review (screenshots, downloads, edited files)
 - **unsorted/**: Corrupted or completely unreadable files → manual intervention required
 
-This structure makes it immediately clear which photos have trustworthy dates vs. which need manual attention.
+**Filename deduplication logic** (new in v0.1.1):
+- Detects existing timestamp prefixes in filenames (e.g., `2025-09-02 200936 description`)
+- Extracts only the description part to avoid double timestamps
+- Example: `2025-09-02 200936 holy grasp of undying zed.png` → `2025-11-23_090750_holy grasp of undying zed.png`
+
+This structure makes it immediately clear which media have trustworthy dates vs. which need manual attention.
 
 ---
 
@@ -602,6 +618,70 @@ python main.py search --object dog
 
 ---
 
+## Planned Enhancements (v0.2.0)
+
+### iCloud Photo Details Integration
+
+**Goal**: Use iCloud's Photo Details CSVs for better date extraction and deduplication.
+
+**Components needed**:
+
+1. **`src/photo_details_parser.py`** - Parse consolidated Photo Details CSVs
+   - Load CSVs into `{filename: {date, checksum, ...}}` lookup dict
+   - Parse iCloud date format: `"Friday July 4,2025 3:46 AM GMT"`
+   - Extract both `originalCreationDate` and `fileChecksum`
+   - Fast in-memory lookups during Stage 1 processing
+
+2. **Update `src/exif_parser.py`** - Add Photo Details date fallback
+   - Current hierarchy: EXIF → filesystem
+   - New hierarchy: EXIF → Photo Details `originalCreationDate` → filesystem
+   - Benefits: Fewer photos in `filesystem_dates/` directory
+
+3. **Update `src/database.py`** - Add iCloud checksum column
+   ```sql
+   ALTER TABLE images ADD COLUMN icloud_checksum TEXT;
+   CREATE INDEX idx_icloud_checksum ON images(icloud_checksum);
+   ```
+   - Store iCloud's `fileChecksum` for deduplication
+   - Validate our computed hashes against iCloud's
+   - Cross-reference: find duplicates across exports
+
+4. **Update `orchestration/stage1_process_photos.py`** - iCloud export mode
+   - Add `--icloud-export` flag
+   - Auto-detect Photo Details CSVs
+   - Consolidate duplicates (use existing `dev_tools/consolidate_photo_details.py`)
+   - Load into parser for date fallback
+
+**Decision**: Deferred until after initial 176GB test run to measure impact.
+
+### Architecture Refactoring
+
+**Merge EXIF modules** (`gps_extractor.py` + `exif_parser.py` → `exif_extractor.py`)
+- Both perform EXIF operations, should be one module
+- No functional changes, just consolidation
+- Improves discoverability and reduces module count
+- Educational separation served its purpose during development
+
+### Video Metadata Extraction
+
+**Current limitation**: Videos are organized but GPS/metadata not extracted
+
+**Needed for Stage 2 (GPS extraction for videos)**:
+- PIL cannot read video metadata - needs different tooling
+- Options: ffprobe (from ffmpeg), exiftool, or mediainfo
+- New dependency: likely ffmpeg (most common, well-supported)
+- Implementation:
+  - Update `src/gps_extractor.py` to detect video file types
+  - Call ffprobe for video metadata instead of PIL
+  - Parse JSON output for GPS coordinates
+  - Same database schema (videos and photos both go to `locations` table)
+- Videos already go to `videos/YYYY/` directories in Stage 1
+- This unblocks full GPS coverage for video files
+
+**Decision**: Defer to v0.2.0 - focus on photo pipeline first, add video metadata support after 176GB test.
+
+---
+
 ## Resources & References
 
 ### Key Files for Context
@@ -625,5 +705,5 @@ python main.py search --object dog
 
 ---
 
-**Last Updated**: 2025-11-19 after v0.1.0 test suite completion  
-**Next**: Install YOLO dependencies, Stage 3 object detection
+**Last Updated**: 2025-11-25 - Added video organization, fixed double timestamp bug, planned v0.2.0 enhancements
+**Next**: Test Stage 1+2 on real iCloud export (176GB), then Stage 3 object detection
