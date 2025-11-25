@@ -16,9 +16,13 @@ Usage:
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, MofNCompleteColumn
 
 from src.database import create_database, insert_image
 from src.organize import rename_and_organize
+
+console = Console()
 
 app = typer.Typer()
 
@@ -37,13 +41,13 @@ def process_photos(
     - Adding new photos without reprocessing existing
     - Database recovery scenarios
     """
-    print(f"\n{'=' * 60}")
-    print("PROCESSING PHOTOS")
-    print(f"{'=' * 60}")
-    print(f"Processing photos from: {source_dir}")
-    print(f"Organizing to: {output_dir}")
-    print(f"Database: {db_path}")
-    print(f"Recursive: {recursive}\n")
+    console.print(f"\n[bold cyan]{'=' * 60}[/bold cyan]")
+    console.print("[bold cyan]PROCESSING PHOTOS[/bold cyan]")
+    console.print(f"[bold cyan]{'=' * 60}[/bold cyan]")
+    console.print(f"[cyan]Processing photos from:[/cyan] {source_dir}")
+    console.print(f"[cyan]Organizing to:[/cyan] {output_dir}")
+    console.print(f"[cyan]Database:[/cyan] {db_path}")
+    console.print(f"[cyan]Recursive:[/cyan] {recursive}\n")
 
     # Create/connect to database
     conn = create_database(db_path)
@@ -53,9 +57,10 @@ def process_photos(
     cursor.execute("SELECT original_path FROM images")
     already_processed = {row[0] for row in cursor.fetchall()}
 
-    print(f"📊 Database contains {len(already_processed)} processed images\n")
+    console.print(f"[yellow]📊 Database contains {len(already_processed)} processed images[/yellow]\n")
 
     # Process and organize files
+    console.print("[yellow]🔍 Scanning directories and organizing files...[/yellow]")
     results = rename_and_organize(source_dir, output_dir, preserve_filenames, recursive)
 
     # Separate results by file type
@@ -64,58 +69,77 @@ def process_photos(
     metadata_files = [r for r in results if r["file_type"] == "metadata"]
     other_files = [r for r in results if r["file_type"] == "other"]
 
-    # Insert images and track progress
+    console.print(f"[green]✓ Found {len(images)} images to process[/green]\n")
+
+    # Insert images and track progress with Rich progress bar
     new_count = 0
     skip_count = 0
-    MAX_SKIP_DISPLAY = 5  # Show first 5 skips, then summarize
+    SAMPLE_DISPLAY_LIMIT = 20  # Only show detailed output for first 20 files
 
-    for image_data in images:
-        # Show processing progress
-        print(f"📸 {Path(image_data['original_path']).name} → {image_data['filename']}")
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[cyan]Processing images...", total=len(images))
 
-        # Check if already in database
-        if image_data["original_path"] in already_processed:
-            skip_count += 1
+        for idx, image_data in enumerate(images, start=1):
+            filename = Path(image_data['original_path']).name
 
-            # Show first few skips, then summarize rest
-            if skip_count <= MAX_SKIP_DISPLAY:
-                print(f"  ⏭️  Skip: {image_data['filename']} (already in database)")
-            elif skip_count == MAX_SKIP_DISPLAY + 1:
-                remaining = len(images) - new_count - MAX_SKIP_DISPLAY
-                print(f"  ⏭️  ... and {remaining} more skipped")
+            # Check if already in database
+            if image_data["original_path"] in already_processed:
+                skip_count += 1
+                progress.update(task, advance=1, description=f"[yellow]⏭️  Skipping {filename}")
 
-            continue
+                # Show sample of skipped files
+                if skip_count <= SAMPLE_DISPLAY_LIMIT:
+                    progress.console.print(f"  [dim yellow]⏭️  Skip: {image_data['filename']} (already in database)[/dim yellow]")
+                elif skip_count == SAMPLE_DISPLAY_LIMIT + 1:
+                    progress.console.print(f"  [dim yellow]... and more files skipped (see progress bar)[/dim yellow]")
+                continue
 
-        # Insert new image
-        image_id = insert_image(conn, image_data)
-        new_count += 1
-        print(f"  ✅ DB ID {image_id}: {image_data['filename']}")
+            # Insert new image
+            progress.update(task, description=f"[cyan]📸 Processing {filename}")
+            insert_image(conn, image_data)
+            new_count += 1
+
+            # Show sample of processed files
+            if new_count <= SAMPLE_DISPLAY_LIMIT:
+                progress.console.print(f"  [dim green]✅ {image_data['original_path'].split('/')[-1]} → {image_data['filename']}[/dim green]")
+            elif new_count == SAMPLE_DISPLAY_LIMIT + 1:
+                progress.console.print(f"  [dim green]... and more files being processed (see progress bar)[/dim green]")
+
+            progress.advance(task)
 
     conn.close()
 
     # Report skipped files
     if videos:
-        print(f"\n📹 Skipped {len(videos)} video files")
+        console.print(f"\n[yellow]📹 {len(videos)} video files organized (metadata extraction in v0.2.0)[/yellow]")
     if metadata_files:
-        print(f"📄 Skipped {len(metadata_files)} metadata files")
+        console.print(f"[yellow]📄 Skipped {len(metadata_files)} metadata files (Photo Details CSVs, etc.)[/yellow]")
     if other_files:
-        print(f"❓ Skipped {len(other_files)} other files")
+        console.print(f"[yellow]❓ Skipped {len(other_files)} other files[/yellow]")
 
     # Summary
-    print(f"\n{'=' * 60}")
-    print("Processing Complete")
-    print(f"{'=' * 60}")
-    print(f"✅ New images: {new_count}")
+    console.print(f"\n[bold green]{'=' * 60}[/bold green]")
+    console.print("[bold green]Processing Complete[/bold green]")
+    console.print(f"[bold green]{'=' * 60}[/bold green]")
+    console.print(f"[green]✅ New images:[/green] {new_count}")
     if skip_count > 0:
-        print(f"⏭️  Skipped (already processed): {skip_count}")
-    print(f"📊 Total in database: {len(already_processed) + new_count}")
+        console.print(f"[yellow]⏭️  Skipped (already processed):[/yellow] {skip_count}")
+    console.print(f"[cyan]📊 Total in database:[/cyan] {len(already_processed) + new_count}")
 
     if new_count > 0:
-        print(f"📁 Organized into: {output_dir}")
-        print(f"🗄️  Database: {db_path}")
+        console.print(f"[cyan]📁 Organized into:[/cyan] {output_dir}")
+        console.print(f"[cyan]🗄️  Database:[/cyan] {db_path}")
     else:
-        print("⚠️  No new images processed")
-    print(f"{'=' * 60}")
+        console.print("[yellow]⚠️  No new images processed[/yellow]")
+    console.print(f"[bold green]{'=' * 60}[/bold green]")
 
 
 @app.command()
@@ -179,13 +203,18 @@ def main(
     output_dir = output if output else config_data["paths"]["output_directory"]
     db_path = db if db else config_data["paths"]["database"]
 
-    # Expand paths if provided via CLI
+    # Expand paths (CLI args come as strings, config values are already Path objects)
     if source:
         source_dir = Path(source_dir).expanduser()
     if output:
         output_dir = Path(output_dir).expanduser()
     if db:
         db_path = Path(db_path).expanduser()
+
+    # Ensure all paths are Path objects (config returns Path objects already)
+    source_dir = Path(source_dir) if not isinstance(source_dir, Path) else source_dir
+    output_dir = Path(output_dir) if not isinstance(output_dir, Path) else output_dir
+    db_path = Path(db_path) if not isinstance(db_path, Path) else db_path
 
     # Validate source directory exists
     if not source_dir.exists():
