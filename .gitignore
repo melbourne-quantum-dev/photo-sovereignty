@@ -26,6 +26,7 @@ htmlcov/s
 # All contents gitignored except directory structure
 data/sample_photos/*
 data/organized_sample_photos/*
+data/test_*
 data/iCloud_Export
 data/*.db
 data/*.db-journal
