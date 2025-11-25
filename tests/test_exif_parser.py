@@ -63,10 +63,12 @@ class TestExifDateExtraction:
                 # All possible date sources from extract_exif_date()
                 valid_sources = [
                     "exif",
+                    "exif_original",
                     "exif_datetime_original",
                     "exif_datetime_digitized",
                     "exif_datetime_camera",
                     "exif_datetime_unknown",
+                    "filename_timestamp",
                     "filesystem",
                     "filename",
                 ]
@@ -183,12 +185,12 @@ class TestFilenameGeneration:
             assert str(path).endswith(expected_ext)
 
     def test_generate_path_year_directory(self):
-        """Path should include year directory."""
+        """Path should include year directory within photos/."""
         date = datetime(2025, 5, 22, 14, 30, 22)
         path = generate_organized_path(date, "exif", "test.jpg")
 
-        # Should start with year/
-        assert str(path).startswith("2025/")
+        # Should be photos/YYYY/
+        assert str(path).startswith("photos/2025/")
 
     def test_generate_path_different_years(self):
         """Different years should generate different directories."""
@@ -198,9 +200,9 @@ class TestFilenameGeneration:
         path_2024 = generate_organized_path(datetime(2024, 1, 1), "exif", original)
         path_2025 = generate_organized_path(datetime(2025, 1, 1), "exif", original)
 
-        assert str(path_2023).startswith("2023/")
-        assert str(path_2024).startswith("2024/")
-        assert str(path_2025).startswith("2025/")
+        assert str(path_2023).startswith("photos/2023/")
+        assert str(path_2024).startswith("photos/2024/")
+        assert str(path_2025).startswith("photos/2025/")
 
     def test_generate_path_midnight(self):
         """Midnight timestamp should be formatted correctly."""
@@ -270,14 +272,93 @@ class TestFileOrganization:
 
     @pytest.mark.integration
     def test_year_directories_created(self, sample_photos_dir, temp_dir):
-        """Year subdirectories should be created."""
+        """Year subdirectories should be created within photos/."""
         output_dir = temp_dir / "organized"
         results = rename_and_organize(str(sample_photos_dir), str(output_dir))
 
         if len(results) > 0:
-            # At least one year directory should exist
-            year_dirs = list(output_dir.glob("[0-9][0-9][0-9][0-9]"))
+            # At least one year directory should exist under photos/
+            year_dirs = list((output_dir / "photos").glob("[0-9][0-9][0-9][0-9]"))
             assert len(year_dirs) > 0, "At least one year directory should be created"
+
+
+class TestFilenameTimestampExtraction:
+    """Test extracting dates from filename patterns."""
+
+    def test_extract_date_from_yyyymmdd_hhmmss(self):
+        """Extract date from YYYY-MM-DD HHMMSS pattern."""
+        from src.exif_parser import extract_date_from_filename
+
+        date, source = extract_date_from_filename("2025-09-02 200936 description.png")
+        assert date == datetime(2025, 9, 2, 20, 9, 36)
+        assert source == "filename_timestamp"
+
+    def test_extract_date_from_screenshot_with_at(self):
+        """Extract date from 'Screenshot YYYY-MM-DD at HH-MM-SS' pattern."""
+        from src.exif_parser import extract_date_from_filename
+
+        date, source = extract_date_from_filename(
+            "Screenshot 2025-03-29 at 18-38-44.png"
+        )
+        assert date == datetime(2025, 3, 29, 18, 38, 44)
+        assert source == "filename_timestamp"
+
+    def test_extract_date_from_screenshot_no_at(self):
+        """Extract date from 'Screenshot YYYY-MM-DD HHMMSS' pattern."""
+        from src.exif_parser import extract_date_from_filename
+
+        date, source = extract_date_from_filename("Screenshot 2025-07-06 121830.jpg")
+        assert date == datetime(2025, 7, 6, 12, 18, 30)
+        assert source == "filename_timestamp"
+
+    def test_extract_date_from_yyyymmdd_hhmmss_compact(self):
+        """Extract date from YYYYMMDD_HHMMSS pattern."""
+        from src.exif_parser import extract_date_from_filename
+
+        date, source = extract_date_from_filename("20231215_143022.jpg")
+        assert date == datetime(2023, 12, 15, 14, 30, 22)
+        assert source == "filename_timestamp"
+
+    def test_filename_without_timestamp_returns_none(self):
+        """Filenames without timestamps should return None."""
+        from src.exif_parser import extract_date_from_filename
+
+        date, source = extract_date_from_filename("vacation-photo.jpg")
+        assert date is None
+        assert source is None
+
+    def test_filename_timestamp_integration_with_exif(self):
+        """Test that filename timestamps are used in extract_exif_date."""
+        # Test with a PNG file that has no EXIF but timestamp in filename
+        import tempfile
+        from pathlib import Path
+        from PIL import Image
+
+        # Create a temporary PNG with no EXIF
+        with tempfile.NamedTemporaryFile(
+            suffix="_2025-09-02 200936 test.png", delete=False
+        ) as tmp:
+            img = Image.new("RGB", (10, 10), color="red")
+            img.save(tmp.name)
+            tmp_path = Path(tmp.name)
+
+            try:
+                date, source = extract_exif_date(str(tmp_path))
+                assert date == datetime(2025, 9, 2, 20, 9, 36)
+                assert source == "filename_timestamp"
+            finally:
+                tmp_path.unlink()
+
+    def test_filename_timestamp_goes_to_year_directory(self):
+        """Files with filename timestamps should go to year directories."""
+        date = datetime(2025, 9, 2, 20, 9, 36)
+        path = generate_organized_path(
+            date, "filename_timestamp", "2025-09-02 200936 description.png"
+        )
+
+        # Should go to year directory, not filesystem_dates
+        assert str(path).startswith("photos/2025/")
+        assert "filesystem_dates" not in str(path)
 
 
 class TestFilenamePreservation:
@@ -401,7 +482,7 @@ class TestFilesystemDatesDirectory:
         assert "piazza-dei-signori" in str(path)
 
     def test_exif_date_goes_to_year_directory(self):
-        """Images with EXIF dates should go to YYYY/ directory."""
+        """Images with EXIF dates should go to photos/YYYY/ directory."""
         from datetime import datetime
 
         date = datetime(2023, 6, 15, 14, 30, 22)
@@ -410,7 +491,7 @@ class TestFilesystemDatesDirectory:
             date, "exif_original", "photo.jpg", preserve_filenames="descriptive_only"
         )
 
-        assert str(path).startswith("2023/")
+        assert str(path).startswith("photos/2023/")
         assert "filesystem_dates" not in str(path)
 
     def test_unsorted_directory_for_no_date(self):
