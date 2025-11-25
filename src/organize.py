@@ -59,15 +59,60 @@ def _is_descriptive_name(stem: str) -> bool:
     )
 
 
+def _extract_description_from_timestamped_name(stem: str) -> str | None:
+    """Extract description from filename that already has a timestamp prefix.
+
+    Handles patterns like:
+    - '2025-09-02 200936 holy grasp of undying zed' → 'holy grasp of undying zed'
+    - '2025-01-22_121254 vacation photos' → 'vacation photos'
+    - 'Screenshot 2025-03-29 at 18-38-44 Open Deep-Research' → 'Open Deep-Research'
+    - '20231215_143022 family dinner' → 'family dinner'
+
+    Args:
+        stem: Filename without extension
+
+    Returns:
+        Description text if found, None if filename is pure timestamp or no timestamp
+    """
+    import re
+
+    # Patterns that match timestamp prefixes with potential descriptions
+    # Each pattern has a capture group for the description part
+    timestamp_patterns = [
+        # YYYY-MM-DD HHMMSS description
+        r"^\d{4}-\d{2}-\d{2}\s+\d{6}\s+(.+)$",
+        # YYYY-MM-DD_HHMMSS description
+        r"^\d{4}-\d{2}-\d{2}_\d{6}\s+(.+)$",
+        # YYYYMMDD_HHMMSS description
+        r"^\d{8}_\d{6}\s+(.+)$",
+        # Screenshot YYYY-MM-DD at HH-MM-SS description
+        r"^Screenshot\s+\d{4}-\d{2}-\d{2}\s+at\s+\d{2}-\d{2}-\d{2}\s+(.+)$",
+        # Screenshot YYYY-MM-DD HHMMSS description
+        r"^Screenshot\s+\d{4}-\d{2}-\d{2}\s+\d{6}\s+(.+)$",
+    ]
+
+    for pattern in timestamp_patterns:
+        match = re.match(pattern, stem, re.IGNORECASE)
+        if match:
+            description = match.group(1).strip()
+            # Only return if there's actual descriptive content
+            if description:
+                return description
+
+    return None
+
+
 def generate_organized_path(
     date,
     source_type,
     original_filename,
     preserve_filenames: str | bool = "descriptive_only",
+    media_type: str = "photo",
 ):
     """Generate organized file path with optional filename preservation.
 
     Organization strategy:
+    - Media split: photos/ and videos/ directories
     - Reliable EXIF dates → YYYY/ directory
     - Filesystem dates → filesystem_dates/ (needs review)
     - No date → unsorted/
@@ -80,22 +125,27 @@ def generate_organized_path(
             - 'descriptive_only': Preserve only non-camera names (default)
             - True: Always preserve original name
             - False: Never preserve (timestamp only)
+        media_type: 'photo' or 'video' (determines top-level directory)
 
     Returns:
         Path object like:
-        - '2025/2025-06-02_001524.heic' (EXIF, camera name)
-        - '2023/2023-06-15_143022_wedding-reception.jpg' (EXIF, descriptive)
-        - 'filesystem_dates/2025-11-23_095802_piazza-dei-signori.jpg'
-        - 'unsorted/corrupted-file.jpg'
+        - 'photos/2025/2025-06-02_001524.heic' (EXIF, camera name)
+        - 'photos/2023/2023-06-15_143022_wedding-reception.jpg' (EXIF, descriptive)
+        - 'videos/2020/2020-03-15_143530.mov'
+        - 'photos/filesystem_dates/2025-11-23_095802_piazza-dei-signori.jpg'
+        - 'videos/unsorted/corrupted-file.mov'
     """
     # Extract original stem (without extension) and extension
     original_path = Path(original_filename)
     ext = original_path.suffix.lower()
     original_stem = original_path.stem
 
+    # Determine media subdirectory (photos/ or videos/)
+    media_dir = "photos" if media_type == "photo" else "videos"
+
     # Case 1: No date at all (corrupted/unreadable)
     if date is None:
-        return Path("unsorted") / original_filename
+        return Path(media_dir) / "unsorted" / original_filename
 
     # Generate timestamp
     timestamp = date.strftime("%Y-%m-%d_%H%M%S")
@@ -110,28 +160,43 @@ def generate_organized_path(
 
     # Build filename
     if should_preserve:
-        filename = f"{timestamp}_{original_stem}{ext}"
+        # Check if original filename already has a timestamp prefix
+        # If so, extract just the description to avoid double timestamps
+        description = _extract_description_from_timestamped_name(original_stem)
+        if description:
+            # Normalize description: replace spaces with hyphens for consistency
+            normalized_desc = description.replace(" ", "-")
+            filename = f"{timestamp}_{normalized_desc}{ext}"
+        else:
+            # No timestamp prefix detected, use full original stem
+            # Also normalize spaces to hyphens
+            normalized_stem = original_stem.replace(" ", "-")
+            filename = f"{timestamp}_{normalized_stem}{ext}"
     else:
         filename = f"{timestamp}{ext}"
 
     # Case 2: Filesystem date (unreliable - needs manual review)
     if source_type in ["filesystem", "exif_datetime_unknown"]:
-        return Path("filesystem_dates") / filename
+        return Path(media_dir) / "filesystem_dates" / filename
 
-    # Case 3: Reliable EXIF date
+    # Case 3: Reliable date (EXIF or filename timestamp)
     year = date.strftime("%Y")
-    return Path(year) / filename
+    return Path(media_dir) / year / filename
 
 
 def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_only"):
-    """Process all images in source_dir, organize into dest_dir.
+    """Process all photos and videos in source_dir, organize into dest_dir.
 
     This is a pure data processing function - no user output.
     Orchestration layer handles progress reporting.
 
+    Media organization:
+    - Photos → photos/ subdirectory (organized by date)
+    - Videos → videos/ subdirectory (organized by date)
+
     Args:
-        source_dir: Source directory with photos
-        dest_dir: Destination directory for organized photos
+        source_dir: Source directory with photos and videos
+        dest_dir: Destination directory for organized media
         preserve_filenames: Filename preservation strategy:
             - 'descriptive_only': Preserve only non-camera names (default)
             - True: Always preserve original name
@@ -146,7 +211,7 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
             - date_source: str
             - camera_make: str or None
             - camera_model: str or None
-            - file_type: str ('image', 'video', 'metadata', 'other')
+            - file_type: str ('photo', 'video', 'metadata', 'other')
             - processed: bool (True if copied, False if skipped)
 
     Raises:
@@ -169,6 +234,19 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
         "*.JPEG",
         "*.png",
         "*.PNG",
+        "*.webp",
+        "*.WEBP",
+    ]
+
+    video_patterns = [
+        "*.mov",
+        "*.MOV",
+        "*.mp4",
+        "*.MP4",
+        "*.avi",
+        "*.AVI",
+        "*.mkv",
+        "*.MKV",
     ]
 
     # Store results
@@ -181,17 +259,20 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
 
         suffix = file_path.suffix.lower()
 
-        # Check if supported image
+        # Check if supported media type
         is_image = any(file_path.match(pattern) for pattern in image_patterns)
+        is_video = any(file_path.match(pattern) for pattern in video_patterns)
 
-        if is_image:
+        if is_image or is_video:
+            # Determine media type
+            media_type = "photo" if is_image else "video"
             # Extract metadata
             date, source_type = extract_exif_date(file_path)
             camera = extract_camera_info(file_path)
 
             # Generate organized path
             rel_path = generate_organized_path(
-                date, source_type, file_path.name, preserve_filenames
+                date, source_type, file_path.name, preserve_filenames, media_type
             )
             new_path = dest / rel_path
 
@@ -211,7 +292,7 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
                     "date_source": source_type,
                     "camera_make": camera["make"],
                     "camera_model": camera["model"],
-                    "file_type": "image",
+                    "file_type": media_type,  # 'photo' or 'video'
                     "processed": True,
                 }
             )
