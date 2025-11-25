@@ -3,8 +3,8 @@
 
 This module handles:
 - Generating organized file paths based on dates
-- Organizing photos from source to destination directories
-- Extracting photos from zip archives (iCloud exports, etc.)
+- Organizing media (images and videos) from source to destination directories
+- Extracting media from zip archives (iCloud exports, etc.)
 
 Separation of concerns:
 - This module performs file operations and returns data
@@ -107,12 +107,12 @@ def generate_organized_path(
     source_type,
     original_filename,
     preserve_filenames: str | bool = "descriptive_only",
-    media_type: str = "photo",
+    media_type: str = "image",
 ):
     """Generate organized file path with optional filename preservation.
 
     Organization strategy:
-    - Media split: photos/ and videos/ directories
+    - Media split: images/ and videos/ directories
     - Reliable EXIF dates → YYYY/ directory
     - Filesystem dates → filesystem_dates/ (needs review)
     - No date → unsorted/
@@ -125,7 +125,7 @@ def generate_organized_path(
             - 'descriptive_only': Preserve only non-camera names (default)
             - True: Always preserve original name
             - False: Never preserve (timestamp only)
-        media_type: 'photo' or 'video' (determines top-level directory)
+        media_type: 'image' or 'video' (determines top-level directory)
 
     Returns:
         Path object like:
@@ -141,7 +141,7 @@ def generate_organized_path(
     original_stem = original_path.stem
 
     # Determine media subdirectory (photos/ or videos/)
-    media_dir = "photos" if media_type == "photo" else "videos"
+    media_dir = "photos" if media_type == "image" else "videos"
 
     # Case 1: No date at all (corrupted/unreadable)
     if date is None:
@@ -184,23 +184,28 @@ def generate_organized_path(
     return Path(media_dir) / year / filename
 
 
-def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_only"):
-    """Process all photos and videos in source_dir, organize into dest_dir.
+def rename_and_organize(
+    source_dir, dest_dir, preserve_filenames="descriptive_only", recursive=False
+):
+    """Process all images and videos in source_dir, organize into dest_dir.
 
     This is a pure data processing function - no user output.
     Orchestration layer handles progress reporting.
 
     Media organization:
-    - Photos → photos/ subdirectory (organized by date)
+    - Images → photos/ subdirectory (organized by date)
     - Videos → videos/ subdirectory (organized by date)
 
     Args:
-        source_dir: Source directory with photos and videos
+        source_dir: Source directory with images and videos
         dest_dir: Destination directory for organized media
         preserve_filenames: Filename preservation strategy:
             - 'descriptive_only': Preserve only non-camera names (default)
             - True: Always preserve original name
             - False: Never preserve (timestamp only)
+        recursive: Process subdirectories recursively (default: False)
+            - True: Recursively process all subdirectories (useful for multi-part iCloud exports)
+            - False: Only process files in immediate directory (safer default)
 
     Returns:
         list of dicts: Each dict contains:
@@ -211,7 +216,7 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
             - date_source: str
             - camera_make: str or None
             - camera_model: str or None
-            - file_type: str ('photo', 'video', 'metadata', 'other')
+            - file_type: str ('image', 'video', 'metadata', 'other')
             - processed: bool (True if copied, False if skipped)
 
     Raises:
@@ -252,8 +257,16 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
     # Store results
     results = []
 
+    # Get file iterator based on recursive flag
+    if recursive:
+        # Recursively find all files
+        file_iterator = source.rglob("*")
+    else:
+        # Only immediate directory
+        file_iterator = source.iterdir()
+
     # Process all files
-    for file_path in source.iterdir():
+    for file_path in file_iterator:
         if not file_path.is_file():
             continue
 
@@ -265,7 +278,7 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
 
         if is_image or is_video:
             # Determine media type
-            media_type = "photo" if is_image else "video"
+            media_type = "image" if is_image else "video"
             # Extract metadata
             date, source_type = extract_exif_date(file_path)
             camera = extract_camera_info(file_path)
@@ -292,7 +305,7 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
                     "date_source": source_type,
                     "camera_make": camera["make"],
                     "camera_model": camera["model"],
-                    "file_type": media_type,  # 'photo' or 'video'
+                    "file_type": media_type,  # 'image' or 'video'
                     "processed": True,
                 }
             )
@@ -324,7 +337,7 @@ def rename_and_organize(source_dir, dest_dir, preserve_filenames="descriptive_on
 
 
 def unzip_archive(zip_path, extract_to=None):
-    """Extract photos from zip archive (iCloud exports, photo backups, etc.).
+    """Extract media from zip archive (iCloud exports, photo backups, etc.).
 
     Common use cases:
     - iCloud Photo Library exports (often zipped)

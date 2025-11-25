@@ -28,6 +28,7 @@ def process_photos(
     output_dir,
     db_path="photo_archive.db",
     preserve_filenames="descriptive_only",
+    recursive=False,
 ):
     """Main processing pipeline with duplicate checking.
 
@@ -41,7 +42,8 @@ def process_photos(
     print(f"{'=' * 60}")
     print(f"Processing photos from: {source_dir}")
     print(f"Organizing to: {output_dir}")
-    print(f"Database: {db_path}\n")
+    print(f"Database: {db_path}")
+    print(f"Recursive: {recursive}\n")
 
     # Create/connect to database
     conn = create_database(db_path)
@@ -54,7 +56,7 @@ def process_photos(
     print(f"📊 Database contains {len(already_processed)} processed images\n")
 
     # Process and organize files
-    results = rename_and_organize(source_dir, output_dir, preserve_filenames)
+    results = rename_and_organize(source_dir, output_dir, preserve_filenames, recursive)
 
     # Separate results by file type
     images = [r for r in results if r["file_type"] == "image"]
@@ -192,9 +194,10 @@ def main(
 
     # Extract processing options
     preserve_filenames = config_data["processing"]["preserve_filenames"]
+    recursive = config_data["processing"]["recursive"]
 
     # Run processing
-    process_photos(str(source_dir), str(output_dir), str(db_path), preserve_filenames)
+    process_photos(str(source_dir), str(output_dir), str(db_path), preserve_filenames, recursive)
 
 
 if __name__ == "__main__":
