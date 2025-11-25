@@ -56,6 +56,26 @@ Local-first ML-powered photo organization that replicates cloud service search c
 - Database backend swappable
 - Orchestration can change without touching core logic
 
+### Naming Conventions
+
+**Terminology: "image" vs "photo"**
+
+The codebase uses different terms depending on context:
+
+**Internal/Technical (code, database):** Use "image"
+- Database table: `images`
+- Code variables: `file_type: "image"`, `media_type: "image"`
+- More technically accurate (includes photos, screenshots, graphics, renders)
+- Standard in ML/CV libraries (PIL = Python Imaging Library, "image classification")
+
+**User-Facing (directories, documentation):** Use "photos"
+- Directory structure: `/photos` and `/videos`
+- Matches project name "Photo Sovereignty"
+- Familiar to end users (iCloud Photos, Google Photos, etc.)
+- More intuitive than "images" for photo collections
+
+**Rationale:** This separation mirrors common industry patterns (GitHub uses "repository" internally but "repo" in UI). "Image" is technically precise for code, while "photos" is user-friendly for directories and documentation.
+
 ### Module Responsibilities
 
 **`src/config.py`** (98.15% coverage)
@@ -88,6 +108,9 @@ Local-first ML-powered photo organization that replicates cloud service search c
   - `'descriptive_only'` (default): Strips camera names (IMG_1234, UUIDs), preserves descriptive names
   - `true`: Always preserves original filenames
   - `false`: Never preserves (timestamp only)
+- Recursive processing (config: `recursive`)
+  - `false` (default): Only process files in immediate directory (safer)
+  - `true`: Recursively process all subdirectories (useful for multi-part iCloud exports)
 - Recognizes camera patterns: IMG_*, DSC*, PXL_*, iCloud UUIDs, Screenshots
 - Archive extraction (unzip iCloud exports, photo backups)
 - File type classification (images, videos, metadata, other)

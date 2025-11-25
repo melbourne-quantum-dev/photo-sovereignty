@@ -42,6 +42,13 @@ paths:
   # model_cache: ~/.cache/photo-pipeline/models
 
 processing:
+  # Process subdirectories recursively (useful for multi-part iCloud exports)
+  # Options:
+  #   true  - Recursively process all subdirectories
+  #   false - Only process files in immediate directory (safer)
+  # Default: false
+  # recursive: false
+
   # Batch size for ML processing (adjust based on GPU memory)
   # YOLO: 32 works on 12GB VRAM (RTX 3080)
   # CLIP: 64 works on 12GB VRAM
