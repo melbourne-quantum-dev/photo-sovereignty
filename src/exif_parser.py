@@ -136,6 +136,7 @@ def extract_exif_date(image_path):
         - 'filename_timestamp': Date parsed from filename (screenshots, etc.)
         - 'filesystem': File modification time (fallback)
     """
+    # Try EXIF extraction first (works for photos, fails for videos)
     try:
         img = Image.open(image_path)
         exif = img.getexif()
@@ -158,20 +159,27 @@ def extract_exif_date(image_path):
                     return (dt, "exif_datetime_camera")
                 else:
                     return (dt, "exif_datetime_unknown")
+    except Exception:
+        # PIL cannot open videos - expected, continue to fallback methods
+        pass
 
-        # Priority 3: Try parsing date from filename
+    # Priority 3: Try parsing date from filename (works for photos and videos)
+    try:
         path = Path(image_path)
         filename_date, source = extract_date_from_filename(path.name)
         if filename_date:
             return (filename_date, source)
+    except Exception:
+        pass
 
-        # Priority 4: Fallback to filesystem mtime
+    # Priority 4: Fallback to filesystem mtime (always works)
+    try:
+        path = Path(image_path)
         mtime = path.stat().st_mtime
         dt = datetime.fromtimestamp(mtime)
         return (dt, "filesystem")
-
     except Exception:
-        # Return None on any error - orchestration handles logging
+        # Only return None if filesystem access also fails
         return (None, None)
 
 
