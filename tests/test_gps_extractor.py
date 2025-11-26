@@ -24,7 +24,7 @@ Version: v0.1.0
 
 import pytest
 
-from src.gps_extractor import extract_gps_coords
+from src.exif_extractor import extract_gps_coords
 
 
 class TestGPSExtraction:

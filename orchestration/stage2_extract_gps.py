@@ -72,7 +72,7 @@ import typer
 
 from src.config import load_config
 from src.database import create_database, insert_location, query_images_without_gps
-from src.gps_extractor import extract_gps_coords
+from src.exif_extractor import extract_gps_coords
 
 app = typer.Typer()
 

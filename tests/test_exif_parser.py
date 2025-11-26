@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 
-from src.exif_parser import extract_camera_info, extract_exif_date
+from src.exif_extractor import extract_camera_info, extract_exif_date
 from src.organize import generate_organized_path, rename_and_organize
 
 
@@ -287,7 +287,7 @@ class TestFilenameTimestampExtraction:
 
     def test_extract_date_from_yyyymmdd_hhmmss(self):
         """Extract date from YYYY-MM-DD HHMMSS pattern."""
-        from src.exif_parser import extract_date_from_filename
+        from src.exif_extractor import extract_date_from_filename
 
         date, source = extract_date_from_filename("2025-09-02 200936 description.png")
         assert date == datetime(2025, 9, 2, 20, 9, 36)
@@ -295,7 +295,7 @@ class TestFilenameTimestampExtraction:
 
     def test_extract_date_from_screenshot_with_at(self):
         """Extract date from 'Screenshot YYYY-MM-DD at HH-MM-SS' pattern."""
-        from src.exif_parser import extract_date_from_filename
+        from src.exif_extractor import extract_date_from_filename
 
         date, source = extract_date_from_filename(
             "Screenshot 2025-03-29 at 18-38-44.png"
@@ -305,7 +305,7 @@ class TestFilenameTimestampExtraction:
 
     def test_extract_date_from_screenshot_no_at(self):
         """Extract date from 'Screenshot YYYY-MM-DD HHMMSS' pattern."""
-        from src.exif_parser import extract_date_from_filename
+        from src.exif_extractor import extract_date_from_filename
 
         date, source = extract_date_from_filename("Screenshot 2025-07-06 121830.jpg")
         assert date == datetime(2025, 7, 6, 12, 18, 30)
@@ -313,7 +313,7 @@ class TestFilenameTimestampExtraction:
 
     def test_extract_date_from_yyyymmdd_hhmmss_compact(self):
         """Extract date from YYYYMMDD_HHMMSS pattern."""
-        from src.exif_parser import extract_date_from_filename
+        from src.exif_extractor import extract_date_from_filename
 
         date, source = extract_date_from_filename("20231215_143022.jpg")
         assert date == datetime(2023, 12, 15, 14, 30, 22)
@@ -321,7 +321,7 @@ class TestFilenameTimestampExtraction:
 
     def test_filename_without_timestamp_returns_none(self):
         """Filenames without timestamps should return None."""
-        from src.exif_parser import extract_date_from_filename
+        from src.exif_extractor import extract_date_from_filename
 
         date, source = extract_date_from_filename("vacation-photo.jpg")
         assert date is None
@@ -359,6 +359,93 @@ class TestFilenameTimestampExtraction:
         # Should go to year directory, not filesystem_dates
         assert str(path).startswith("photos/2025/")
         assert "filesystem_dates" not in str(path)
+
+    def test_extract_date_from_screenshot_flexible_separators(self):
+        """Extract date from screenshots with hyphens and dots."""
+        from src.exif_extractor import extract_date_from_filename
+
+        # Screenshot-2022-06-07-at-10.42.24-am
+        date, source = extract_date_from_filename(
+            "Screenshot-2022-06-07-at-10.42.24-am.jpeg"
+        )
+        assert date == datetime(2022, 6, 7, 10, 42, 24)
+        assert source == "filename_timestamp"
+
+        # Screenshot_2022-01-22-09-13-25
+        date, source = extract_date_from_filename(
+            "Screenshot_2022-01-22-09-13-25-999_com.discord2.jpg"
+        )
+        assert date == datetime(2022, 1, 22, 9, 13, 25)
+        assert source == "filename_timestamp"
+
+        # Screenshot-from-2025-03-18-02-57-03
+        date, source = extract_date_from_filename(
+            "Screenshot-from-2025-03-18-02-57-03.png"
+        )
+        assert date == datetime(2025, 3, 18, 2, 57, 3)
+        assert source == "filename_timestamp"
+
+        # Screenshot 2025-04-09 at 12.35.28 pm
+        date, source = extract_date_from_filename(
+            "Screenshot 2025-04-09 at 12.35.28 pm.jpeg"
+        )
+        assert date == datetime(2025, 4, 9, 12, 35, 28)
+        assert source == "filename_timestamp"
+
+    def test_extract_date_from_yymmdd_hhmm(self):
+        """Extract date from YYMMDD_HHMM pattern (manual timestamps)."""
+        from src.exif_extractor import extract_date_from_filename
+
+        # 250710_1519 at beginning
+        date, source = extract_date_from_filename("250710_1519_description.png")
+        assert date == datetime(2025, 7, 10, 15, 19, 0)
+        assert source == "filename_timestamp"
+
+        # 250710_1519 at end
+        date, source = extract_date_from_filename(
+            "yeahnahallgood_doormat_w1nst0n_250710_1519.png"
+        )
+        assert date == datetime(2025, 7, 10, 15, 19, 0)
+        assert source == "filename_timestamp"
+
+        # 250710_1519 in middle
+        date, source = extract_date_from_filename("prefix_250710_1519_suffix.png")
+        assert date == datetime(2025, 7, 10, 15, 19, 0)
+        assert source == "filename_timestamp"
+
+    def test_yymmdd_hhmm_description_extraction(self):
+        """Test description extraction from YYMMDD_HHMM pattern."""
+        from src.organize import _extract_description_from_timestamped_name
+
+        # Timestamp at end
+        desc = _extract_description_from_timestamped_name(
+            "yeahnahallgood_doormat_w1nst0n_250710_1519"
+        )
+        assert desc == "yeahnahallgood_doormat_w1nst0n"
+
+        # Timestamp at beginning
+        desc = _extract_description_from_timestamped_name("250710_1519_description")
+        assert desc == "description"
+
+        # No description (just timestamp)
+        desc = _extract_description_from_timestamped_name("250710_1519")
+        assert desc is None
+
+    def test_screenshot_flexible_description_extraction(self):
+        """Test description extraction from flexible screenshot patterns."""
+        from src.organize import _extract_description_from_timestamped_name
+
+        # Screenshot with description
+        desc = _extract_description_from_timestamped_name(
+            "Screenshot-2022-06-07-at-10.42.24-am Deep Research"
+        )
+        assert desc == "Deep Research"
+
+        # Screenshot without description (just timestamp)
+        desc = _extract_description_from_timestamped_name(
+            "Screenshot-2022-06-07-at-10.42.24-am"
+        )
+        assert desc is None
 
 
 class TestFilenamePreservation:

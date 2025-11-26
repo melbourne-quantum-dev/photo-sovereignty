@@ -16,7 +16,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from src.exif_parser import extract_camera_info, extract_exif_date
+from src.exif_extractor import extract_camera_info, extract_exif_date
 
 
 def _is_descriptive_name(stem: str) -> bool:
@@ -66,7 +66,10 @@ def _extract_description_from_timestamped_name(stem: str) -> str | None:
     - '2025-09-02 200936 holy grasp of undying zed' → 'holy grasp of undying zed'
     - '2025-01-22_121254 vacation photos' → 'vacation photos'
     - 'Screenshot 2025-03-29 at 18-38-44 Open Deep-Research' → 'Open Deep-Research'
+    - 'Screenshot-2022-06-07-at-10.42.24-am Deep Research' → 'Deep Research'
     - '20231215_143022 family dinner' → 'family dinner'
+    - 'yeahnahallgood_doormat_w1nst0n_250710_1519' → 'yeahnahallgood_doormat_w1nst0n'
+    - '250710_1519_description' → 'description'
 
     Args:
         stem: Filename without extension
@@ -79,25 +82,40 @@ def _extract_description_from_timestamped_name(stem: str) -> str | None:
     # Patterns that match timestamp prefixes with potential descriptions
     # Each pattern has a capture group for the description part
     timestamp_patterns = [
+        # Screenshot with flexible separators (matches exif_extractor.py pattern)
+        # Captures description after timestamp, excluding am/pm suffix
+        r"^Screenshot[\s\-_]+(?:from[\s\-_]+)?\d{4}-\d{2}-\d{2}[\s\-_]+(?:at[\s\-_]+)?\d{2}[\.\-:]\d{2}[\.\-:]\d{2}[\s\-_]*(?:am|pm)?[\s\-_]*(.+)$",
         # YYYY-MM-DD HHMMSS description
         r"^\d{4}-\d{2}-\d{2}\s+\d{6}\s+(.+)$",
         # YYYY-MM-DD_HHMMSS description
         r"^\d{4}-\d{2}-\d{2}_\d{6}\s+(.+)$",
         # YYYYMMDD_HHMMSS description
         r"^\d{8}_\d{6}\s+(.+)$",
-        # Screenshot YYYY-MM-DD at HH-MM-SS description
-        r"^Screenshot\s+\d{4}-\d{2}-\d{2}\s+at\s+\d{2}-\d{2}-\d{2}\s+(.+)$",
-        # Screenshot YYYY-MM-DD HHMMSS description
-        r"^Screenshot\s+\d{4}-\d{2}-\d{2}\s+\d{6}\s+(.+)$",
     ]
 
     for pattern in timestamp_patterns:
         match = re.match(pattern, stem, re.IGNORECASE)
         if match:
+            # Get the first (and only) capture group (description)
             description = match.group(1).strip()
-            # Only return if there's actual descriptive content
-            if description:
+            # Only return if there's actual descriptive content (not just am/pm)
+            if description and description.lower() not in ['am', 'pm']:
                 return description
+
+    # YYMMDD_HHMM pattern - can be at beginning or end
+    # Pattern: YYMMDD_HHMM_description → description
+    match = re.match(r"^\d{6}_\d{4}_(.+)$", stem)
+    if match:
+        description = match.group(1).strip()
+        if description:
+            return description
+
+    # Pattern: description_YYMMDD_HHMM → description
+    match = re.match(r"^(.+)_\d{6}_\d{4}$", stem)
+    if match:
+        description = match.group(1).strip()
+        if description:
+            return description
 
     return None
 
@@ -185,7 +203,11 @@ def generate_organized_path(
 
 
 def rename_and_organize(
-    source_dir, dest_dir, preserve_filenames="descriptive_only", recursive=False
+    source_dir,
+    dest_dir,
+    preserve_filenames="descriptive_only",
+    recursive=False,
+    photo_details: dict | None = None,
 ):
     """Process all images and videos in source_dir, organize into dest_dir.
 
@@ -206,6 +228,9 @@ def rename_and_organize(
         recursive: Process subdirectories recursively (default: False)
             - True: Recursively process all subdirectories (useful for multi-part iCloud exports)
             - False: Only process files in immediate directory (safer default)
+        photo_details: Optional dict from photo_details_parser.load_photo_details()
+            - Provides iCloud canonical dates for photos without EXIF
+            - Particularly helpful for screenshots and edited photos
 
     Returns:
         list of dicts: Each dict contains:
@@ -279,8 +304,8 @@ def rename_and_organize(
         if is_image or is_video:
             # Determine media type
             media_type = "image" if is_image else "video"
-            # Extract metadata
-            date, source_type = extract_exif_date(file_path)
+            # Extract metadata (with optional Photo Details for improved dates)
+            date, source_type = extract_exif_date(file_path, photo_details)
             camera = extract_camera_info(file_path)
 
             # Generate organized path
