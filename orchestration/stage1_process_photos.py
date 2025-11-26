@@ -2,12 +2,21 @@
 """
 Process photos: Extract EXIF, organize files, store in database.
 
+This script orchestrates Stage 1 of the photo processing pipeline:
+- Extracts EXIF metadata (dates, camera info)
+- Organizes photos into semantic directory structure (YYYY/, filesystem_dates/, unsorted/)
+- Optionally integrates iCloud Photo Details for improved date extraction
+- Stores metadata in SQLite database
+
 Usage:
     # Use config.yaml paths (recommended)
     python stage1_process_photos.py
 
     # Override specific paths
     python stage1_process_photos.py --source ~/Downloads/photos --db test.db
+
+    # Process iCloud export with Photo Details integration
+    python stage1_process_photos.py --source ~/Downloads/iCloud_Export --icloud-export
 
     # Use custom config file
     python stage1_process_photos.py --config production.yaml
@@ -21,6 +30,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 
 from src.database import create_database, insert_image
 from src.organize import rename_and_organize
+from src.photo_details_parser import consolidate_csvs, load_photo_details
 
 console = Console()
 
@@ -33,6 +43,7 @@ def process_photos(
     db_path="photo_archive.db",
     preserve_filenames="descriptive_only",
     recursive=False,
+    photo_details: dict | None = None,
 ):
     """Main processing pipeline with duplicate checking.
 
@@ -47,7 +58,11 @@ def process_photos(
     console.print(f"[cyan]Processing photos from:[/cyan] {source_dir}")
     console.print(f"[cyan]Organizing to:[/cyan] {output_dir}")
     console.print(f"[cyan]Database:[/cyan] {db_path}")
-    console.print(f"[cyan]Recursive:[/cyan] {recursive}\n")
+    console.print(f"[cyan]Recursive:[/cyan] {recursive}")
+    if photo_details:
+        console.print(f"[cyan]Photo Details:[/cyan] {len(photo_details)} entries loaded\n")
+    else:
+        console.print()
 
     # Create/connect to database
     conn = create_database(db_path)
@@ -59,9 +74,11 @@ def process_photos(
 
     console.print(f"[yellow]📊 Database contains {len(already_processed)} processed images[/yellow]\n")
 
-    # Process and organize files
+    # Process and organize files (with optional Photo Details)
     console.print("[yellow]🔍 Scanning directories and organizing files...[/yellow]")
-    results = rename_and_organize(source_dir, output_dir, preserve_filenames, recursive)
+    results = rename_and_organize(
+        source_dir, output_dir, preserve_filenames, recursive, photo_details
+    )
 
     # Separate results by file type
     images = [r for r in results if r["file_type"] == "image"]
@@ -168,6 +185,11 @@ def main(
         "-d",
         help="Database file path (overrides config)",
     ),
+    icloud_export: bool = typer.Option(
+        False,
+        "--icloud-export",
+        help="Enable iCloud export mode (loads Photo Details CSVs for better date extraction)",
+    ),
 ):
     """Process photos: Extract EXIF, organize files, store in database.
 
@@ -176,12 +198,20 @@ def main(
         This enables privacy-preserving development (config.yaml gitignored) while
         maintaining flexible CLI interface for testing/debugging.
 
+    iCloud Export Mode:
+        Enable --icloud-export to automatically load Photo Details CSVs for better
+        date extraction. Particularly useful for screenshots and edited photos that
+        lack EXIF metadata. Supports multi-part iCloud exports (auto-consolidates).
+
     Examples:
         # Use config.yaml paths (recommended)
         python stage1_process_photos.py
 
         # Override specific paths
         python stage1_process_photos.py --source ~/Downloads/photos --db test.db
+
+        # Process iCloud export with Photo Details integration
+        python stage1_process_photos.py --source ~/Downloads/iCloud_Export --icloud-export
 
         # Use custom config file
         python stage1_process_photos.py --config production.yaml
@@ -225,8 +255,42 @@ def main(
     preserve_filenames = config_data["processing"]["preserve_filenames"]
     recursive = config_data["processing"]["recursive"]
 
+    # Load Photo Details if iCloud export mode enabled
+    photo_details = None
+    if icloud_export:
+        console.print("[cyan]🔍 iCloud export mode enabled - searching for Photo Details CSVs...[/cyan]")
+
+        # Find all Photo Details CSVs in source directory (handles multi-part exports)
+        csv_files = list(source_dir.rglob("Photo Details*.csv"))
+
+        if csv_files:
+            console.print(f"[green]✓ Found {len(csv_files)} Photo Details CSV file(s)[/green]")
+
+            # Consolidate if multiple CSVs found
+            if len(csv_files) > 1:
+                console.print("[yellow]📊 Consolidating multiple CSV files...[/yellow]")
+                consolidated_path = output_dir / "consolidated_photo_details.csv"
+                consolidate_csvs(csv_files, consolidated_path)
+                console.print(f"[green]✓ Consolidated to: {consolidated_path}[/green]")
+            else:
+                consolidated_path = csv_files[0]
+                console.print(f"[green]✓ Using: {consolidated_path}[/green]")
+
+            # Load Photo Details
+            photo_details = load_photo_details(consolidated_path)
+            console.print(f"[green]✓ Loaded {len(photo_details)} photo details entries[/green]\n")
+        else:
+            console.print("[yellow]⚠️  No Photo Details CSVs found - continuing without iCloud metadata[/yellow]\n")
+
     # Run processing
-    process_photos(str(source_dir), str(output_dir), str(db_path), preserve_filenames, recursive)
+    process_photos(
+        str(source_dir),
+        str(output_dir),
+        str(db_path),
+        preserve_filenames,
+        recursive,
+        photo_details,
+    )
 
 
 if __name__ == "__main__":
