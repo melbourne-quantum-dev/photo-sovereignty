@@ -1,8 +1,8 @@
 # Claude Context: Photo Sovereignty Pipeline
 
-**Version**: v0.1.1-dev
-**Last Updated**: 2025-11-25
-**Status**: Foundation complete with video support, ready for 176GB test, Stage 3 (YOLO) next
+**Version**: v0.2.0-dev
+**Last Updated**: 2025-11-26
+**Status**: Stage 1-2 complete (EXIF/GPS extraction + iCloud Photo Details integration), 176GB test ready, Stage 3 (YOLO) next
 
 This document provides architectural context for Claude instances working on this codebase.
 
@@ -12,7 +12,7 @@ This document provides architectural context for Claude instances working on thi
 
 Local-first ML-powered photo organization that replicates cloud service search capabilities (iCloud, Google Photos) while maintaining complete data sovereignty. All processing happens locally, no cloud APIs.
 
-**Current State**: Stages 1-2 complete (EXIF/GPS extraction), Stage 3 (YOLO object detection) next.
+**Current State**: v0.2.0 - Stages 1-2 complete (EXIF/GPS extraction, iCloud Photo Details integration, enhanced filename patterns), Stage 3 (YOLO object detection) next.
 
 ---
 
@@ -41,8 +41,8 @@ Local-first ML-powered photo organization that replicates cloud service search c
               ▼
 ┌─────────────────────────────────────────┐
 │  Layer 1: Extraction & Organization     │
-│  (src/exif_parser.py, gps_extractor.py, │
-│   organize.py)                          │
+│  (src/exif_extractor.py,                │
+│   photo_details_parser.py, organize.py) │
 │  - Pure functions (data in → data out)  │
 │  - No database operations               │
 │  - No user-facing output                │
@@ -90,15 +90,37 @@ The codebase uses different terms depending on context:
 - Idempotent operations (safe to re-run)
 - LEFT JOIN pattern for finding unprocessed items
 
-**`src/exif_parser.py`**
-- EXIF metadata extraction only (separation from organization logic)
-- Date extraction hierarchy: EXIF DateTimeOriginal > DateTime > filesystem
+**`src/exif_extractor.py`** (78.29% coverage)
+- Consolidated EXIF metadata extraction (merged exif_parser.py + gps_extractor.py)
+- Date extraction with enhanced hierarchy:
+  1. EXIF DateTimeOriginal (camera capture - most reliable)
+  2. EXIF DateTime (with camera make)
+  3. Photo Details originalCreationDate (iCloud canonical date)
+  4. Filename timestamp (screenshots, manual YYMMDD_HHMM patterns)
+  5. Filesystem mtime (last resort)
+- Flexible filename pattern support:
+  - Screenshot variations: flexible separators (space/-/_), time formats (.:-), 'at'/'from' prepositions, am/pm
+  - Manual timestamps: YYMMDD_HHMM format (e.g., 250710_1519 → 2025-07-10 15:19)
 - Camera information extraction (make, model)
-- Returns `(datetime, source_string)` tuple
-- No user-facing output (returns None on errors)
+- GPS coordinate extraction from EXIF IFD tag 34853 (DMS → decimal with hemisphere corrections)
+- Returns Python native types: `(datetime, source_string)` tuples, `(lat, lon, alt)` tuples
+- No user-facing output (returns None on errors, silent error handling)
+- Single PIL import and HEIC registration for entire module
 - Handles HEIC via pillow-heif
 
-**`src/organize.py`**
+**`src/photo_details_parser.py`** (82.09% coverage)
+- Parse iCloud Photo Details CSV files for metadata extraction
+- `parse_icloud_date()`: Parse iCloud date format ("Friday July 4,2025 3:46 AM GMT")
+- `load_photo_details()`: Load CSV into `{filename: {date, checksum}}` lookup dict
+- `consolidate_csvs()`: Merge multi-part iCloud export CSVs with deduplication
+- Separation of concerns:
+  - exif_extractor.py reads metadata from file contents (binary)
+  - photo_details_parser.py reads metadata from CSV files (text)
+  - organize.py makes organizational decisions using both sources
+- Provides canonical creation dates for screenshots/edited photos lacking EXIF
+- Enables iCloud export mode in Stage 1 processing
+
+**`src/organize.py`** (83.84% coverage)
 - File organization with semantic directory structure
 - Three-tier organization strategy:
   - `YYYY/` - Reliable EXIF dates (trusted photo dates)
@@ -116,12 +138,7 @@ The codebase uses different terms depending on context:
 - File type classification (images, videos, metadata, other)
 - Returns structured data dicts with file_type and processed fields
 - No user-facing output (orchestration handles logging)
-
-**`src/gps_extractor.py`** (91.43% coverage)
-- Extracts GPS from EXIF IFD tag 34853
-- DMS → decimal conversion with hemisphere corrections
-- Returns `(lat, lon, alt)` tuple or None
-- Converts PIL IFDRational to Python float internally
+- Accepts optional `photo_details` parameter for iCloud Photo Details integration
 
 **`orchestration/stage{N}_*.py`**
 - Modular processing scripts (one per stage)
@@ -131,6 +148,7 @@ The codebase uses different terms depending on context:
 - Each follows same pattern: query → extract → persist → report
 - All user-facing output (print statements) lives here
 - Orchestration layer: combines src/* modules with progress reporting
+- `stage1_process_photos.py`: Includes `--icloud-export` mode for auto-detecting and consolidating Photo Details CSVs
 
 **`dev_tools/inspect_db.py`**
 - Unified database inspection utility
@@ -465,14 +483,36 @@ query_by_date_range(conn, "2025-01-02", "2025-01-04 23:59:59")
 
 ```python
 # RIGHT
-from src.gps_extractor import extract_gps_coords
+from src.exif_extractor import extract_gps_coords, extract_exif_date
 from src.database import insert_image
 
 # WRONG
-from gps_extractor import extract_gps_coords  # ModuleNotFoundError
+from exif_extractor import extract_gps_coords  # ModuleNotFoundError
 ```
 
-### 8. Archive Directory Exclusion
+### 8. Photo Details Integration
+
+**`extract_exif_date()` accepts optional `photo_details` parameter:**
+
+```python
+# Without Photo Details (standard extraction)
+date, source = extract_exif_date(image_path)
+
+# With Photo Details (iCloud export mode)
+photo_details = load_photo_details(csv_path)
+date, source = extract_exif_date(image_path, photo_details)
+```
+
+**Date hierarchy with Photo Details**:
+1. EXIF DateTimeOriginal (camera - most reliable)
+2. EXIF DateTime (with camera make)
+3. Photo Details originalCreationDate (iCloud canonical)
+4. Filename timestamp (screenshots, manual YYMMDD_HHMM)
+5. Filesystem mtime (fallback)
+
+**Why**: Photo Details provides canonical dates for screenshots/edited photos that lack EXIF. Pass-through from orchestration → process_photos() → rename_and_organize() → extract_exif_date().
+
+### 9. Archive Directory Exclusion
 
 **pytest must exclude `tests/archive/`:**
 
@@ -549,6 +589,9 @@ print(f"Lat: {lat}, Lon: {lon}")
 ```bash
 # Stage 1: EXIF extraction and organization
 python orchestration/stage1_process_photos.py --source ~/Pictures --output ~/organized
+
+# Stage 1: With iCloud export mode (auto-detects Photo Details CSVs)
+python orchestration/stage1_process_photos.py --source ~/iCloud_Export --output ~/organized --icloud-export
 
 # Stage 2: GPS extraction
 python orchestration/stage2_extract_gps.py --db ~/organized/photo_archive.db
@@ -641,49 +684,7 @@ python main.py search --object dog
 
 ---
 
-## Planned Enhancements (v0.2.0)
-
-### iCloud Photo Details Integration
-
-**Goal**: Use iCloud's Photo Details CSVs for better date extraction and deduplication.
-
-**Components needed**:
-
-1. **`src/photo_details_parser.py`** - Parse consolidated Photo Details CSVs
-   - Load CSVs into `{filename: {date, checksum, ...}}` lookup dict
-   - Parse iCloud date format: `"Friday July 4,2025 3:46 AM GMT"`
-   - Extract both `originalCreationDate` and `fileChecksum`
-   - Fast in-memory lookups during Stage 1 processing
-
-2. **Update `src/exif_parser.py`** - Add Photo Details date fallback
-   - Current hierarchy: EXIF → filesystem
-   - New hierarchy: EXIF → Photo Details `originalCreationDate` → filesystem
-   - Benefits: Fewer photos in `filesystem_dates/` directory
-
-3. **Update `src/database.py`** - Add iCloud checksum column
-   ```sql
-   ALTER TABLE images ADD COLUMN icloud_checksum TEXT;
-   CREATE INDEX idx_icloud_checksum ON images(icloud_checksum);
-   ```
-   - Store iCloud's `fileChecksum` for deduplication
-   - Validate our computed hashes against iCloud's
-   - Cross-reference: find duplicates across exports
-
-4. **Update `orchestration/stage1_process_photos.py`** - iCloud export mode
-   - Add `--icloud-export` flag
-   - Auto-detect Photo Details CSVs
-   - Consolidate duplicates (use existing `dev_tools/consolidate_photo_details.py`)
-   - Load into parser for date fallback
-
-**Decision**: Deferred until after initial 176GB test run to measure impact.
-
-### Architecture Refactoring
-
-**Merge EXIF modules** (`gps_extractor.py` + `exif_parser.py` → `exif_extractor.py`)
-- Both perform EXIF operations, should be one module
-- No functional changes, just consolidation
-- Improves discoverability and reduces module count
-- Educational separation served its purpose during development
+## Planned Enhancements (v0.3.0+)
 
 ### Video Metadata Extraction
 
@@ -694,14 +695,14 @@ python main.py search --object dog
 - Options: ffprobe (from ffmpeg), exiftool, or mediainfo
 - New dependency: likely ffmpeg (most common, well-supported)
 - Implementation:
-  - Update `src/gps_extractor.py` to detect video file types
+  - Update `src/exif_extractor.py` to detect video file types
   - Call ffprobe for video metadata instead of PIL
   - Parse JSON output for GPS coordinates
   - Same database schema (videos and photos both go to `locations` table)
 - Videos already go to `videos/YYYY/` directories in Stage 1
 - This unblocks full GPS coverage for video files
 
-**Decision**: Defer to v0.2.0 - focus on photo pipeline first, add video metadata support after 176GB test.
+**Decision**: Defer to v0.3.0+ - focus on photo pipeline first, add video metadata support after YOLO implementation.
 
 ---
 
@@ -728,5 +729,5 @@ python main.py search --object dog
 
 ---
 
-**Last Updated**: 2025-11-25 - Added video organization, fixed double timestamp bug, planned v0.2.0 enhancements
-**Next**: Test Stage 1+2 on real iCloud export (176GB), then Stage 3 object detection
+**Last Updated**: 2025-11-26 - v0.2.0 refactoring complete: EXIF consolidation (exif_extractor.py), Photo Details integration, enhanced filename patterns (YYMMDD_HHMM, flexible screenshots), iCloud export mode
+**Next**: Stage 3 object detection (YOLO), then video metadata extraction in v0.3.0+
